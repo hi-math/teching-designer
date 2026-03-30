@@ -521,72 +521,47 @@ export default function WorkspaceShell({ lessonId: _lessonId }: { lessonId: stri
           {/* ── 워크스페이스 ───────────────────────────────────────── */}
           <main className="flex flex-1 flex-col overflow-hidden bg-white">
             {/* 단계 스테퍼 + 섹션 탭 통합 영역 */}
-            <div className="shrink-0" style={{ backgroundColor: "#F2F5FA" }}>
+            <div className="shrink-0 pt-6" style={{ backgroundColor: "#F2F5FA" }}>
 
               {/* 상위 탭 — 언더라인 진행형 */}
               {(() => {
                 const activeIdx = PHASES.findIndex((p) => p.code === activePhase);
                 return (
-                  <div className="flex border-b border-[#D8E2F0]">
+                  <div className="flex items-end px-14 border-b border-[#D8E2F0]">
                     {PHASES.map((phase, idx) => {
                       const status =
                         idx < activeIdx ? 'done' : idx === activeIdx ? 'active' : 'default';
                       return (
-                        <button
-                          key={phase.code}
-                          onClick={() => setActivePhase(phase.code)}
-                          className="relative flex flex-1 flex-row items-center justify-center gap-2 px-3 py-5 transition-colors hover:bg-white/40"
-                          style={{
-                            borderBottom: `2.5px solid ${
-                              status === 'done'
-                                ? '#9FE1CB'
-                                : status === 'active'
-                                ? '#534AB7'
-                                : '#D8E2F0'
-                            }`,
-                          }}
-                        >
-                          {/* 완료 닷 */}
-                          {status === 'done' && (
+                        <div key={phase.code} className="flex items-center">
+                          <button
+                            onClick={() => setActivePhase(phase.code)}
+                            className="flex items-center px-4 py-5 transition-colors hover:opacity-70"
+                            style={{
+                              borderBottom: `4px solid ${
+                                status === 'active' ? '#534AB7' : 'transparent'
+                              }`,
+                              marginBottom: -1,
+                            }}
+                          >
                             <span
-                              className="absolute right-3 top-2.5"
+                              className="text-[20px] leading-none"
                               style={{
-                                width: 6, height: 6,
-                                borderRadius: '50%',
-                                background: '#9FE1CB',
-                                display: 'block',
+                                color:
+                                  status === 'active'
+                                    ? '#1C2B3A'
+                                    : status === 'done'
+                                    ? '#9AAAC0'
+                                    : '#C8D4E4',
+                                fontWeight: status === 'active' ? 600 : 400,
                               }}
-                            />
+                            >
+                              {phase.label}
+                            </span>
+                          </button>
+                          {idx < PHASES.length - 1 && (
+                            <span className="text-[16px] text-[#C8D4E4] px-1 pb-1 select-none">›</span>
                           )}
-                          {/* 코드 레이블 — 정사각형 배지 */}
-                          <span
-                            className="flex items-center justify-center rounded-md text-[15px] font-bold leading-none shrink-0"
-                            style={{
-                              width: 36,
-                              height: 36,
-                              background:
-                                status === 'done'
-                                  ? '#0F6E56'
-                                  : status === 'active'
-                                  ? '#534AB7'
-                                  : '#8A9AB8',
-                              color: '#ffffff',
-                            }}
-                          >
-                            {phase.code}
-                          </span>
-                          {/* 탭 명칭 */}
-                          <span
-                            className="text-[20px] leading-none"
-                            style={{
-                              color:
-                                status === 'active' ? '#1C2B3A' : '#9AAAC0',
-                              fontWeight: status === 'active' ? 500 : 400,
-                            }}
-                          >
-                            {phase.label}
-                          </span>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -594,17 +569,17 @@ export default function WorkspaceShell({ lessonId: _lessonId }: { lessonId: stri
               })()}
 
               {/* 하위 탭 — 버튼형 */}
-              <div className="flex items-center gap-2 bg-[#F2F5FA] px-5 pt-10 pb-3">
+              <div className="flex items-center gap-2 bg-[#F2F5FA] px-14 pt-8 pb-0">
                 {(PHASE_SECTIONS[activePhase] ?? []).map((sec) => {
                   const isActive = activeSection === sec.code;
                   return (
                     <button
                       key={sec.code}
                       onClick={() => setActiveSection(sec.code)}
-                      className={`shrink-0 rounded-full px-4 py-1.5 text-[15px] font-medium transition-all ${
+                      className={`shrink-0 px-2 py-1 text-[17px] font-medium transition-colors ${
                         isActive
-                          ? "bg-indigo-600 text-white shadow-[0_2px_8px_rgba(79,70,229,0.35)]"
-                          : "border border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:text-indigo-600"
+                          ? "text-[#534AB7]"
+                          : "text-[#9AAAC0] hover:text-[#534AB7]"
                       }`}
                     >
                       {sec.tabLabel}
@@ -620,7 +595,7 @@ export default function WorkspaceShell({ lessonId: _lessonId }: { lessonId: stri
               const sec = (PHASE_SECTIONS[activePhase] ?? []).find((s) => s.code === activeSection);
               if (!sec) return null;
               return (
-                <div className="flex-1 overflow-y-auto bg-[#F2F5FA] px-10 py-8">
+                <div className="flex-1 overflow-y-auto bg-[#F2F5FA] px-14 pt-4 pb-10">
                   {sec.activities.map((act) => (
                     <div key={act.code} className="mb-6 rounded-2xl border border-[#E4EBF5] bg-white p-6 shadow-sm">
                       <p className="mb-1.5 text-[13px] font-semibold tracking-wider text-indigo-400">{act.code}</p>
