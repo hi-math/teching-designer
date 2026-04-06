@@ -126,7 +126,7 @@ export function formatStandardsContext(standards: Standard[]): string {
 
   for (const s of standards) {
     lines.push(`**${s.code}** — ${s.subject} (${s.school_level} / ${s.grade_group})`);
-    if (s.area) lines.push(`영역: ${s.area}`);
+    if (s.domain) lines.push(`영역: ${s.domain}`);
     lines.push(`내용: ${s.content}`);
     if (s.keywords.length > 0) lines.push(`키워드: ${s.keywords.join(', ')}`);
     if (s.explanation) lines.push(`해설: ${s.explanation.slice(0, 200)}${s.explanation.length > 200 ? '…' : ''}`);
