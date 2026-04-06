@@ -41,6 +41,8 @@ interface PageContext {
   activePhase?: string;
   activeSection?: string;
   activityInputs?: Record<string, string>;
+  selectedActivityCode?: string;
+  referenceFiles?: { name: string; mime: string; content?: string; pdfData?: string }[];
 }
 
 export function buildPageContextBlock(ctx: PageContext): string {
@@ -59,18 +61,49 @@ export function buildPageContextBlock(ctx: PageContext): string {
     lines.push(`- 현재 섹션: ${ctx.activeSection}`);
   }
 
-  const filled = Object.entries(ctx.activityInputs ?? {}).filter(([, v]) => v.trim());
+  if (ctx.selectedActivityCode) {
+    lines.push(`- 현재 선택된 활동 카드: **[${ctx.selectedActivityCode}]**`);
+    const selectedText = ctx.activityInputs?.[ctx.selectedActivityCode]?.trim();
+    if (selectedText) {
+      lines.push('');
+      lines.push('### 선택된 활동 카드 내용 (주요 참고)');
+      lines.push(`**[${ctx.selectedActivityCode}]**`);
+      lines.push(selectedText);
+    }
+  }
+
+  const filled = Object.entries(ctx.activityInputs ?? {})
+    .filter(([code, v]) => v.trim() && code !== ctx.selectedActivityCode);
   if (filled.length > 0) {
     lines.push('');
-    lines.push('### 팀이 작성한 내용');
+    lines.push('### 팀이 작성한 다른 활동 내용');
     for (const [code, value] of filled) {
       lines.push(`**[${code}]**`);
       lines.push(value.trim());
     }
   }
 
+  if (ctx.referenceFiles && ctx.referenceFiles.length > 0) {
+    lines.push('');
+    lines.push('### 업로드된 참고자료');
+    for (const f of ctx.referenceFiles) {
+      if (f.content) {
+        lines.push(`**[${f.name}]**`);
+        lines.push(f.content.length > 3000 ? f.content.slice(0, 3000) + '\n…(이하 생략)' : f.content);
+      } else {
+        lines.push(`**[${f.name}]** (${f.mime || '파일'}) — 텍스트 추출 불가`);
+      }
+    }
+    lines.push('');
+    lines.push('위 참고자료를 바탕으로 팀의 질문에 구체적으로 답변하세요.');
+  }
+
   lines.push('---');
-  lines.push('위 내용을 바탕으로 팀의 현재 진행 상황을 파악하고, 질문에 답변하거나 구체적인 제안을 제공하세요.');
+  if (ctx.selectedActivityCode) {
+    lines.push(`사용자가 [${ctx.selectedActivityCode}] 카드를 선택하여 대화를 시작했습니다. 이 활동과 관련하여 도움을 제공하세요.`);
+  } else {
+    lines.push('위 내용을 바탕으로 팀의 현재 진행 상황을 파악하고, 질문에 답변하거나 구체적인 제안을 제공하세요.');
+  }
 
   return lines.join('\n');
 }

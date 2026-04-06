@@ -4,7 +4,9 @@
       "Bash(cd /c/Users/PC/Documents/asone-projects/teching-designer && npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes 2>&1)",
       "Bash(cp -r /tmp/teching-designer-temp/. /c/Users/PC/Documents/asone-projects/teching-designer/ && echo \"Files copied successfully\")",
       "Bash(cd /c/Users/PC/Documents/asone-projects/teching-designer && npm install @supabase/supabase-js @supabase/ssr 2>&1)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(mkdir -p \"c:/Users/PC/Documents/asone-projects/minerva/supabase/migrations\")",
+      "Bash(mkdir -p \"c:/Users/PC/Documents/asone-projects/minerva/src/lib/db\")"
     ]
   }
 }

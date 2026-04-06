@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ether Workspace - Team Prep</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-dim": "#4e46a3",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-fixed-variant": "#2a207f",
+              "on-error": "#fff7f7",
+              "error": "#a8364b",
+              "outline-variant": "#adb2ba",
+              "error-dim": "#6b0221",
+              "on-surface-variant": "#5a6066",
+              "on-tertiary-fixed": "#040029",
+              "outline": "#757b82",
+              "on-error-container": "#6e0523",
+              "surface-container-highest": "#dde3eb",
+              "surface-container": "#eaeef4",
+              "secondary-fixed": "#dae2ff",
+              "inverse-surface": "#0c0e11",
+              "on-background": "#2d3339",
+              "tertiary-container": "#a19afd",
+              "on-primary-container": "#000000",
+              "on-primary": "#fbf7ff",
+              "surface-bright": "#f8f9fd",
+              "on-secondary-fixed": "#063a8c",
+              "surface": "#f8f9fd",
+              "secondary-dim": "#274fa1",
+              "surface-container-high": "#e4e8ef",
+              "secondary-fixed-dim": "#c5d4ff",
+              "tertiary-fixed-dim": "#948def",
+              "secondary-container": "#dae2ff",
+              "surface-dim": "#d5dae2",
+              "on-primary-fixed": "#ffffff",
+              "inverse-primary": "#8781ff",
+              "error-container": "#f97386",
+              "on-primary-fixed-variant": "#f2eeff",
+              "on-secondary-fixed-variant": "#3158aa",
+              "primary-dim": "#4335d6",
+              "inverse-on-surface": "#9b9da1",
+              "on-surface": "#2d3339",
+              "surface-variant": "#dde3eb",
+              "background": "#f8f9fd",
+              "surface-tint": "#5044e3",
+              "on-tertiary-container": "#211376",
+              "primary-fixed-dim": "#5f55f1",
+              "on-secondary": "#f9f8ff",
+              "secondary": "#365cae",
+              "surface-container-low": "#f1f4f9",
+              "tertiary-fixed": "#a19afd",
+              "on-secondary-container": "#254e9f",
+              "primary": "#5044e3",
+              "tertiary": "#5a53b0",
+              "primary-fixed": "#6c63ff",
+              "on-tertiary": "#fcf7ff",
+              "primary-container": "#6c63ff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        font-size: 20px;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        color: #2d3339;
+        background-color: #f8f9fd;
+      }
+      h1, h2, h3, .font-headline {
+        font-family: 'Manrope', sans-serif;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #dde3eb;
+        border-radius: 10px;
+      }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- Left Panel: SideNavBar -->
+<aside class="fixed left-0 top-0 h-full z-40 h-screen w-64 flex-col bg-slate-50 dark:bg-slate-900 flex transition-all duration-300">
+<div class="p-6 flex items-center gap-3">
+<div class="w-8 h-8 bg-gradient-to-br from-primary to-primary-container rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<div>
+<h1 class="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Ether</h1>
+<p class="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Collaborative Studio</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<a class="flex items-center gap-3 bg-[#6C63FF]/10 text-[#6C63FF] rounded-full px-4 py-2 transition-all duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-label font-semibold text-sm">Projects</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 dark:text-slate-400 px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all duration-300 rounded-full" href="#">
+<span class="material-symbols-outlined" data-icon="book_2">book_2</span>
+<span class="font-label font-semibold text-sm">Library</span>
+</a>
+<a class="flex items-center gap-3 text-slate-500 dark:text-slate-400 px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all duration-300 rounded-full" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label font-semibold text-sm">Settings</span>
+</a>
+</nav>
+<div class="p-4 mt-auto">
+<button class="w-full bg-gradient-to-r from-primary to-primary-dim text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">add</span>
+<span>New Project</span>
+</button>
+<div class="mt-6 flex items-center gap-3 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+<img alt="User Workspace Profile" class="w-10 h-10 rounded-lg object-cover" data-alt="professional portrait of a creative lead in a bright workspace, soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCO_Sib1icEM1ryfo7afPsS09dT6RxjRgPkmAD52TlkGNI2crOTAEIVxJS93jsUWV3PzOY3Jy3WKOIbuMrFWVHVTrNnRZgkiicQgHlbaEJRiOcdraWjVl9c-gmg5zOemk8ZOJLd0K0X0tS5czqO4pBUcjFJRfyofhG0QGbaeKdd6MBom2_ioywm0IR4mLrW-Ar9RaVvyEtuYidnBP3iDYQzpmABJoz_gk16vWPs60GtcS5fAdQLmST8lkf79UgqmDIYJY6hY-_eEiUA"/>
+<div class="overflow-hidden">
+<p class="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">Alex Chen</p>
+<p class="text-[10px] text-slate-500 truncate">Studio Admin</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 flex-1 flex flex-col min-w-0 bg-background">
+<!-- TopNavBar -->
+<header class="sticky top-0 w-full z-30 flex justify-between items-center px-8 h-16 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md">
+<div class="flex items-center gap-6">
+<span class="text-lg font-black tracking-tight text-slate-900 dark:text-slate-50">Ether Workspace</span>
+<!-- Flow Stepper -->
+<nav class="hidden md:flex items-center gap-8 ml-8">
+<a class="text-[#6C63FF] font-bold border-b-2 border-[#6C63FF] pb-1 text-sm" href="#">Team Prep</a>
+<a class="text-slate-400 dark:text-slate-500 font-medium hover:text-[#6C63FF] transition-colors text-sm" href="#">Analysis</a>
+<a class="text-slate-400 dark:text-slate-500 font-medium hover:text-[#6C63FF] transition-colors text-sm" href="#">Design</a>
+<a class="text-slate-400 dark:text-slate-500 font-medium hover:text-[#6C63FF] transition-colors text-sm" href="#">Development</a>
+<a class="text-slate-400 dark:text-slate-500 font-medium hover:text-[#6C63FF] transition-colors text-sm" href="#">Evaluation</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="User profile avatar close-up, neutral background, professional lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUC74_PrilukZ2V7BYuMAJqSruII6piAuxrV7uYAR0_Inz-BURcjqmp0fEzuhFJgG_LLvUZdSy6ZM93Czu0GorE9amJKfkyryNDbXAQlhLDb9U-Xo1IcFv2zlPMEnBKzSKnuQgkKTMXVektKifrKosb5iZURsOyhUlcxxhACAYxacFJaPprV1DwMfeZui09giI_LwVrYDBfmmVTEA7UQG1FXdrzpWGJAzzAAUbwbt5UH7C3-RgHsycyR93gNMMSxRceD03IXaXeIpD"/>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="flex-1 overflow-y-auto p-10 custom-scrollbar">
+<div class="max-w-4xl mx-auto space-y-12">
+<!-- Header Title Section -->
+<header class="space-y-2">
+<p class="text-primary font-bold text-xs uppercase tracking-widest">Phase 01</p>
+<h2 class="text-4xl font-extrabold text-on-surface tracking-tight font-headline">Team Prep</h2>
+<p class="text-on-surface-variant text-lg max-w-2xl">Align your stakeholders and define the core mission before diving into the creative process. High-level clarity starts here.</p>
+</header>
+<!-- Cards Grid -->
+<div class="grid grid-cols-1 gap-8">
+<!-- Card 1: Vision Setting -->
+<section class="bg-surface-container-lowest rounded-2xl p-8 transition-all hover:translate-y-[-2px]">
+<div class="flex items-start justify-between mb-6">
+<div class="space-y-1">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">visibility</span>
+<h3 class="text-xl font-bold font-headline text-on-surface">Vision Setting</h3>
+</div>
+<p class="text-on-surface-variant text-sm">Define the North Star of this project in 2-3 sentences.</p>
+</div>
+<span class="bg-surface-container text-on-surface-variant px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Required</span>
+</div>
+<div class="relative group">
+<textarea class="w-full min-h-[160px] bg-surface-container-low border-none rounded-xl p-4 text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20 transition-all text-body-md" placeholder="Describe the ideal future state of this product..."></textarea>
+<div class="absolute bottom-4 right-4 flex gap-2">
+<button class="p-2 bg-white rounded-lg shadow-sm text-primary hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined">auto_fix</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Card 2: Goal Setting -->
+<section class="bg-surface-container-lowest rounded-2xl p-8 transition-all hover:translate-y-[-2px]">
+<div class="flex items-start justify-between mb-6">
+<div class="space-y-1">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">flag</span>
+<h3 class="text-xl font-bold font-headline text-on-surface">Goal Setting</h3>
+</div>
+<p class="text-on-surface-variant text-sm">Identify 3 key measurable outcomes for this design cycle.</p>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-3 bg-surface-container-low p-4 rounded-xl">
+<span class="w-6 h-6 rounded-full border-2 border-outline-variant flex items-center justify-center text-[10px] font-bold">1</span>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-sm" placeholder="Add first objective..." type="text"/>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-low p-4 rounded-xl">
+<span class="w-6 h-6 rounded-full border-2 border-outline-variant flex items-center justify-center text-[10px] font-bold">2</span>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-sm" placeholder="Add second objective..." type="text"/>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-low p-4 rounded-xl">
+<span class="w-6 h-6 rounded-full border-2 border-outline-variant flex items-center justify-center text-[10px] font-bold">3</span>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-0 text-sm" placeholder="Add third objective..." type="text"/>
+</div>
+</div>
+</section>
+</div>
+<!-- Bento-style Footer Info -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-primary/5 p-6 rounded-2xl border border-primary/10">
+<span class="material-symbols-outlined text-primary mb-3">group</span>
+<h4 class="font-bold text-on-surface">Stakeholders</h4>
+<p class="text-sm text-on-surface-variant">4 members have contributed to this session today.</p>
+</div>
+<div class="bg-secondary/5 p-6 rounded-2xl border border-secondary/10">
+<span class="material-symbols-outlined text-secondary mb-3">history</span>
+<h4 class="font-bold text-on-surface">Last Sync</h4>
+<p class="text-sm text-on-surface-variant">Changes saved automatically 2 minutes ago.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Panel: AI Chatbot Interface -->
+<aside class="w-80 bg-surface-container-lowest flex flex-col shadow-[0px_12px_32px_rgba(45,51,57,0.06)] border-l border-outline-variant/15">
+<!-- Chat Header -->
+<div class="p-6 border-b border-outline-variant/15 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<h3 class="font-bold font-headline text-on-surface">Ether AI</h3>
+</div>
+<button class="text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</div>
+<!-- Chat Conversation -->
+<div class="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+<!-- AI Message -->
+<div class="flex flex-col gap-2 max-w-[90%]">
+<div class="bg-surface-container-high text-on-surface p-4 rounded-xl rounded-bl-sm text-sm leading-relaxed">
+                    Hello! I'm ready to help you with the <span class="font-bold">Team Prep</span> phase. Shall we start by refining the vision statement together?
+                </div>
+<span class="text-[10px] text-outline font-medium px-1">Ether AI • 10:24 AM</span>
+</div>
+<!-- User Message -->
+<div class="flex flex-col gap-2 max-w-[90%] ml-auto items-end">
+<div class="bg-secondary-container text-on-secondary-container p-4 rounded-xl rounded-br-sm text-sm leading-relaxed">
+                    Yes, I want to emphasize "sustainable growth" and "user-centricity" in the vision.
+                </div>
+<span class="text-[10px] text-outline font-medium px-1">You • 10:25 AM</span>
+</div>
+<!-- AI Message -->
+<div class="flex flex-col gap-2 max-w-[90%]">
+<div class="bg-surface-container-high text-on-surface p-4 rounded-xl rounded-bl-sm text-sm leading-relaxed">
+                    Great choice. Integrating those pillars ensures long-term viability. Here's a draft: "To create an ecosystem where sustainable growth meets uncompromising user-centricity, redefining the standard for digital collaboration."
+                </div>
+<span class="text-[10px] text-outline font-medium px-1">Ether AI • 10:25 AM</span>
+</div>
+</div>
+<!-- Chat Input -->
+<div class="p-4 border-t border-outline-variant/15">
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container-low border-none rounded-full py-3 pl-4 pr-12 text-sm focus:ring-2 focus:ring-primary/20 placeholder:text-outline" placeholder="Ask Ether AI something..." type="text"/>
+<button class="absolute right-2 p-2 bg-primary text-white rounded-full hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined !text-sm">send</span>
+</button>
+</div>
+<p class="text-[9px] text-center text-outline mt-3 font-medium uppercase tracking-tighter">AI may generate inaccurate information</p>
+</div>
+</aside>
+</body></html>

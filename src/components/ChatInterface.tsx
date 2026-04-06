@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import MessageBubble, { type Message } from './MessageBubble';
 
 interface PageContext {
@@ -8,12 +9,16 @@ interface PageContext {
   activePhase: string;
   activeSection: string;
   activityInputs: Record<string, string>;
+  selectedActivityCode?: string;
+  referenceFiles?: { name: string; mime: string; content?: string; pdfData?: string }[];
 }
 
 interface Props {
   stage: string;
   onReady?: () => void;
   pageContext?: PageContext;
+  lessonId?: string;
+  userId?: string;
 }
 
 function nowTimestamp() {
@@ -23,7 +28,7 @@ function nowTimestamp() {
   return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
 }
 
-export default function ChatInterface({ stage, onReady, pageContext }: Props) {
+export default function ChatInterface({ stage, onReady, pageContext, lessonId, userId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [timestamps, setTimestamps] = useState<string[]>([]);
   const [input, setInput] = useState('');
@@ -48,11 +53,31 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [input]);
 
-  // 단계 전환 시 대화 초기화
+  // 단계 전환 시 DB에서 대화 기록 로드
   useEffect(() => {
-    setMessages([]);
-    setTimestamps([]);
-  }, [stage]);
+    if (!lessonId || !userId) {
+      setMessages([]);
+      setTimestamps([]);
+      return;
+    }
+    const load = async () => {
+      const { data } = await createClient()
+        .from('ai_messages')
+        .select('role, content, created_at')
+        .eq('lesson_id', lessonId)
+        .eq('context_activity_code', stage)
+        .order('created_at', { ascending: true });
+      if (!data) return;
+      setMessages(data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content })));
+      setTimestamps(data.map((r) => {
+        const d = new Date(r.created_at);
+        const h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, '0');
+        return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
+      }));
+    };
+    load();
+  }, [stage, lessonId, userId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,11 +100,40 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
 
     abortRef.current = new AbortController();
 
+    // 사용자 메시지 DB 저장
+    if (lessonId && userId) {
+      createClient().from('ai_messages').insert({
+        lesson_id: lessonId,
+        user_id: userId,
+        role: 'user',
+        content: text.trim(),
+        context_activity_code: stage,
+      });
+    }
+
     try {
+      // PDF 파일이 있으면 마지막 유저 메시지에 document 블록 삽입
+      const pdfs = (pageContext?.referenceFiles ?? []).filter((f) => f.pdfData);
+      const apiMessages = newMessages.map((m, idx) => {
+        if (idx === newMessages.length - 1 && m.role === 'user' && pdfs.length > 0) {
+          return {
+            role: m.role,
+            content: [
+              ...pdfs.map((f) => ({
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: f.pdfData },
+              })),
+              { type: 'text', text: m.content },
+            ],
+          };
+        }
+        return m;
+      });
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, stage, pageContext }),
+        body: JSON.stringify({ messages: apiMessages, stage, pageContext }),
         signal: abortRef.current.signal,
       });
 
@@ -98,6 +152,17 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
           const updated = [...prev];
           updated[updated.length - 1] = { role: 'assistant', content: accumulated };
           return updated;
+        });
+      }
+
+      // AI 응답 DB 저장 (스트리밍 완료 후)
+      if (lessonId && userId && accumulated) {
+        createClient().from('ai_messages').insert({
+          lesson_id: lessonId,
+          user_id: userId,
+          role: 'assistant',
+          content: accumulated,
+          context_activity_code: stage,
         });
       }
     } catch (err) {
@@ -124,16 +189,16 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#EEF2F8]">
+    <div className="flex flex-col h-full bg-white">
       {/* 메시지 목록 */}
-      <div className="flex-1 overflow-y-auto px-3 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2C3F5A] text-xs font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#6c63ff] text-xs font-bold text-white">
               M
             </div>
-            <p className="text-sm font-semibold text-[#3A4560]">Minerva</p>
-            <p className="text-sm text-[#9AAAC0]">무엇이든 질문해 보세요.</p>
+            <p className="text-sm font-semibold text-[#2d3339]">Minerva AI</p>
+            <p className="text-sm text-[#757b82]">무엇이든 질문해 보세요.</p>
           </div>
         )}
         {messages.map((msg, i) => {
@@ -156,8 +221,8 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
       </div>
 
       {/* 입력창 */}
-      <div className="bg-[#EEF2F8] px-3 pt-2 pb-5">
-        <div className="relative">
+      <div className="bg-white px-4 pt-2 pb-5" style={{ borderTop: "1px solid rgba(173,178,186,0.2)" }}>
+        <div className="relative flex items-center">
           <textarea
             ref={textareaRef}
             value={input}
@@ -166,12 +231,12 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
             placeholder="메시지를 입력하세요..."
             rows={1}
             disabled={isStreaming}
-            className="w-full resize-none rounded-2xl bg-[#D8E3EF] pl-4 pr-11 py-3 text-[15px] text-[#2C3A52] placeholder-[#9AAAC0] outline-none border-none disabled:opacity-50 min-h-[48px]"
+            className="w-full resize-none rounded-full bg-[#f1f4f9] pl-5 pr-12 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none border-none disabled:opacity-50 min-h-[48px] focus:ring-2 focus:ring-[#5044e3]/20"
           />
           {isStreaming && (
             <button
               onClick={() => abortRef.current?.abort()}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-red-400 text-white transition hover:bg-red-500"
+              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-400 text-white transition hover:bg-red-500"
               title="중단"
             >
               <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -182,9 +247,9 @@ export default function ChatInterface({ stage, onReady, pageContext }: Props) {
           {!isStreaming && input.trim() && (
             <button
               onClick={() => sendMessage(input)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-[#2C3F5A] text-white transition hover:bg-[#3D5A7A]"
+              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#4335d6] text-white transition hover:opacity-90"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>

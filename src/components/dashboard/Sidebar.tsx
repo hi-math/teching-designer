@@ -123,10 +123,12 @@ export default function Sidebar({
   profile,
   view,
   onViewChange,
+  onNewItem,
 }: {
   profile: UserProfile;
   view: View;
   onViewChange: (v: View) => void;
+  onNewItem?: (type: "folder" | "lesson") => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
@@ -197,7 +199,7 @@ export default function Sidebar({
             {newMenuOpen && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg">
                 <button
-                  onClick={() => setNewMenuOpen(false)}
+                  onClick={() => { setNewMenuOpen(false); onNewItem?.("folder"); }}
                   className="flex w-full items-center gap-3 px-4 py-2 text-[14px] text-gray-700 hover:bg-gray-50"
                 >
                   <svg className="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
@@ -206,7 +208,7 @@ export default function Sidebar({
                   새 폴더
                 </button>
                 <button
-                  onClick={() => setNewMenuOpen(false)}
+                  onClick={() => { setNewMenuOpen(false); onNewItem?.("lesson"); }}
                   className="flex w-full items-center gap-3 px-4 py-2 text-[14px] text-gray-700 hover:bg-gray-50"
                 >
                   <svg className="h-4 w-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
