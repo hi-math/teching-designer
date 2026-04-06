@@ -774,6 +774,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     let opinionChannel: ReturnType<typeof supabaseRt.channel> | null = null;
 
     (async () => {
+      // 세션이 준비될 때까지 대기 (첫 렌더 시 auth 미초기화 방지)
+      await supabaseRt.auth.getSession();
+
       // ── 의견묻기 Broadcast 채널 (publication 설정 불필요) ──────
       opinionChannel = supabaseRt
         .channel(`opinions:${lessonId}`)
@@ -2017,7 +2020,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
             {/* 팀 채팅 패널 */}
             <div className={`flex-1 flex-col overflow-hidden ${rightTab === "team" ? "flex" : "hidden"}`}>
-              <TeamChatPanel lessonId={lessonId} currentUserId={userProfile?.id ?? ""} />
+              {userProfile && <TeamChatPanel lessonId={lessonId} currentUserId={userProfile.id} />}
             </div>
 
           </div>

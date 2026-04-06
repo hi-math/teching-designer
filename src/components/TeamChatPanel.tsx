@@ -124,6 +124,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
 
   // ── 초기 로드 ────────────────────────────────────────────────
   useEffect(() => {
+    if (!currentUserId) return;
     const load = async () => {
       const supabase = createClient();
       const { data } = await supabase
@@ -164,6 +165,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
 
   // ── Realtime 구독 ────────────────────────────────────────────
   useEffect(() => {
+    if (!currentUserId) return;
     const supabase = createClient();
     const channel = supabase
       .channel(`team_messages:${lessonId}`)
@@ -183,12 +185,15 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           setMessages((prev) => [...prev, msg]);
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[Chat Realtime]', status, err ?? '');
+      });
     return () => { supabase.removeChannel(channel); };
   }, [lessonId, currentUserId, toMessage]);
 
   // ── 리액션 Realtime ──────────────────────────────────────────
   useEffect(() => {
+    if (!currentUserId) return;
     const supabase = createClient();
     const channel = supabase
       .channel(`team_reactions:${lessonId}`)
