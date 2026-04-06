@@ -125,7 +125,8 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   // ── 초기 로드 ────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      const { data } = await createClient()
+      const supabase = createClient();
+      const { data } = await supabase
         .from('team_messages')
         .select('id, user_id, content, created_at, reply_to')
         .eq('lesson_id', lessonId)
@@ -134,14 +135,37 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
         .limit(200);
       if (!data) return;
       const converted = await Promise.all(data.map((row) => toMessage(row, data)));
+
+      // 리액션 로드
+      const ids = converted.map((m) => m.id);
+      if (ids.length > 0) {
+        const { data: rdata } = await supabase
+          .from('team_message_reactions')
+          .select('message_id, user_id, emoji')
+          .in('message_id', ids);
+        if (rdata) {
+          const rmap: Record<string, Record<string, Reaction>> = {};
+          for (const r of rdata) {
+            if (!rmap[r.message_id]) rmap[r.message_id] = {};
+            const ex = rmap[r.message_id][r.emoji];
+            rmap[r.message_id][r.emoji] = {
+              count: (ex?.count ?? 0) + 1,
+              reactedByMe: (ex?.reactedByMe ?? false) || r.user_id === currentUserId,
+            };
+          }
+          setMessages(converted.map((m) => ({ ...m, reactions: rmap[m.id] ?? {} })));
+          return;
+        }
+      }
       setMessages(converted);
     };
     load();
-  }, [lessonId, toMessage]);
+  }, [lessonId, toMessage, currentUserId]);
 
   // ── Realtime 구독 ────────────────────────────────────────────
   useEffect(() => {
-    const channel = createClient()
+    const supabase = createClient();
+    const channel = supabase
       .channel(`team_messages:${lessonId}`)
       .on(
         'postgres_changes',
@@ -149,10 +173,10 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           event: 'INSERT',
           schema: 'public',
           table: 'team_messages',
-          filter: `lesson_id=eq.${lessonId}`,
         },
         async (payload) => {
-          const row = payload.new as { id: string; user_id: string; content: string; created_at: string; reply_to: string | null };
+          const row = payload.new as { id: string; lesson_id: string; user_id: string; content: string; created_at: string; reply_to: string | null };
+          if (row.lesson_id !== lessonId) return;
           // 자신이 보낸 메시지는 sendMessage에서 이미 낙관적으로 추가했으므로 skip
           if (row.user_id === currentUserId) return;
           const msg = await toMessage(row, [row]);
@@ -160,8 +184,52 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
         }
       )
       .subscribe();
-    return () => { createClient().removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [lessonId, currentUserId, toMessage]);
+
+  // ── 리액션 Realtime ──────────────────────────────────────────
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`team_reactions:${lessonId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'team_message_reactions' },
+        (payload) => {
+          const row = payload.new as { message_id: string; user_id: string; emoji: string };
+          if (row.user_id === currentUserId) return;
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== row.message_id) return msg;
+              const ex = msg.reactions[row.emoji];
+              return { ...msg, reactions: { ...msg.reactions, [row.emoji]: { count: (ex?.count ?? 0) + 1, reactedByMe: ex?.reactedByMe ?? false } } };
+            })
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'team_message_reactions' },
+        (payload) => {
+          const row = payload.old as { message_id?: string; user_id?: string; emoji?: string };
+          if (!row.message_id || !row.emoji) return;
+          if (row.user_id === currentUserId) return;
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== row.message_id) return msg;
+              const ex = msg.reactions[row.emoji!];
+              if (!ex) return msg;
+              const updated = { ...msg.reactions };
+              if (ex.count <= 1) delete updated[row.emoji!];
+              else updated[row.emoji!] = { count: ex.count - 1, reactedByMe: ex.reactedByMe };
+              return { ...msg, reactions: updated };
+            })
+          );
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [lessonId, currentUserId]);
 
   // ── 자동 스크롤 ──────────────────────────────────────────────
   useEffect(() => {
@@ -244,24 +312,43 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     }
   };
 
-  // ── 반응 토글 (로컬) ────────────────────────────────────────
-  const toggleReaction = (messageId: string, emoji: string) => {
+  // ── 반응 토글 (DB 저장 + 낙관적 업데이트) ──────────────────
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    const msg = messages.find((m) => m.id === messageId);
+    const alreadyReacted = !!msg?.reactions[emoji]?.reactedByMe;
+
+    // 낙관적 업데이트
     setMessages((prev) =>
-      prev.map((msg) => {
-        if (msg.id !== messageId) return msg;
-        const existing = msg.reactions[emoji];
-        const updated = { ...msg.reactions };
-        if (existing?.reactedByMe) {
-          if (existing.count <= 1) delete updated[emoji];
-          else updated[emoji] = { count: existing.count - 1, reactedByMe: false };
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const existing = m.reactions[emoji];
+        const updated = { ...m.reactions };
+        if (alreadyReacted) {
+          if ((existing?.count ?? 0) <= 1) delete updated[emoji];
+          else updated[emoji] = { count: existing!.count - 1, reactedByMe: false };
         } else {
           updated[emoji] = { count: (existing?.count ?? 0) + 1, reactedByMe: true };
         }
-        return { ...msg, reactions: updated };
+        return { ...m, reactions: updated };
       })
     );
     setReactionPickerFor(null);
     setPickerPos(null);
+
+    // DB 저장
+    const supabase = createClient();
+    if (alreadyReacted) {
+      await supabase
+        .from('team_message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', currentUserId)
+        .eq('emoji', emoji);
+    } else {
+      await supabase
+        .from('team_message_reactions')
+        .insert({ message_id: messageId, user_id: currentUserId, emoji });
+    }
   };
 
   const openPicker = (e: React.MouseEvent<HTMLButtonElement>, msgId: string) => {

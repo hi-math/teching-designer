@@ -9,6 +9,9 @@ import { getAppShellHeaderSurface } from "@/lib/appThemeHeader";
 import ChatInterface from "@/components/ChatInterface";
 import TeamChatPanel from "@/components/TeamChatPanel";
 import ReferenceModal from "@/components/workspace/ReferenceModal";
+import StandardsModal, { type StandardItem } from "@/components/workspace/StandardsModal";
+import IdeasModal, { type IdeaItem } from "@/components/workspace/IdeasModal";
+import ShareModal from "@/components/workspace/ShareModal";
 
 // ─── 워크스페이스 UI 토큰 (세이지 테마 고정) ─────────────────────
 
@@ -326,6 +329,192 @@ function VersionModal({
   );
 }
 
+// ─── 수업정보 모달 ────────────────────────────────────────────────
+
+const GRADE_BUTTONS = ["중학교 1학년", "중학교 2학년", "중학교 3학년"];
+
+const SUBJECT_BUTTONS = [
+  "국어", "수학", "영어", "과학", "사회", "역사", "도덕",
+  "기술·가정", "정보", "체육", "음악", "미술", "한문",
+  "생활 일본어", "생활 중국어", "생활 프랑스어", "생활 독일어",
+  "생활 스페인어", "생활 러시아어", "생활 아랍어", "생활 베트남어",
+];
+
+function toArr(v: string): string[] {
+  return v ? v.split(",").map((s) => s.trim()).filter(Boolean) : [];
+}
+function toStr(arr: string[]): string {
+  return arr.join(",");
+}
+
+function LessonInfoModal({
+  lessonId,
+  title,
+  targetGrade,
+  relatedSubjects,
+  onTitleChange,
+  onTargetGradeChange,
+  onRelatedSubjectsChange,
+  onClose,
+  readOnly = false,
+}: {
+  lessonId: string;
+  title: string;
+  targetGrade: string;
+  relatedSubjects: string;
+  onTitleChange: (v: string) => void;
+  onTargetGradeChange: (v: string) => void;
+  onRelatedSubjectsChange: (v: string) => void;
+  onClose: () => void;
+  readOnly?: boolean;
+}) {
+  const [localTitle, setLocalTitle] = useState(title);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(() => toArr(targetGrade));
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => toArr(relatedSubjects));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    const g = toStr(selectedGrades);
+    const s = toStr(selectedSubjects);
+    await createClient().from("lessons").update({
+      title: localTitle || "새 수업설계",
+      target_grade: g || null,
+      related_subjects: s || null,
+    }).eq("id", lessonId);
+    onTitleChange(localTitle);
+    onTargetGradeChange(g);
+    onRelatedSubjectsChange(s);
+    setSaving(false);
+    onClose();
+  };
+
+  const toggleGrade = (g: string) =>
+    setSelectedGrades((prev) =>
+      prev.includes(g) ? prev.filter((v) => v !== g) : [...prev, g]
+    );
+
+  const toggleSubject = (s: string) =>
+    setSelectedSubjects((prev) =>
+      prev.includes(s) ? prev.filter((v) => v !== s) : [...prev, s]
+    );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-[700px] max-h-[88vh] flex flex-col rounded-2xl border border-gray-200 bg-white shadow-xl">
+        {/* 헤더 */}
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-8 py-6">
+          <h2 className="text-[24px] font-bold text-gray-900">수업정보</h2>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 폼 */}
+        <div className="flex-1 overflow-y-auto space-y-8 px-8 py-7">
+
+          {/* 수업 제목 */}
+          <div>
+            <label className="mb-2 block text-[14px] font-semibold text-[#5a6066]">수업 제목</label>
+            <input
+              value={localTitle}
+              onChange={(e) => !readOnly && setLocalTitle(e.target.value)}
+              readOnly={readOnly}
+              placeholder="수업 제목을 입력하세요"
+              className={`w-full rounded-xl bg-[#f1f4f9] px-4 py-3 text-[16px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
+            />
+          </div>
+
+          {/* 대상 학년 */}
+          <div>
+            <label className="mb-2.5 block text-[14px] font-semibold text-[#5a6066]">대상 학년</label>
+            <div className="flex gap-2.5">
+              {GRADE_BUTTONS.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => !readOnly && toggleGrade(g)}
+                  disabled={readOnly}
+                  className={`rounded-full px-6 py-2.5 text-[14px] font-medium transition ${
+                    selectedGrades.includes(g)
+                      ? "bg-[#5044e3] text-white"
+                      : "bg-[#f1f4f9] text-[#757b82] hover:bg-[#e8eaf4] hover:text-[#5044e3]"
+                  } ${readOnly ? "cursor-default" : ""}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 연계 과목 */}
+          <div>
+            <label className="mb-2.5 block text-[14px] font-semibold text-[#5a6066]">연계 과목</label>
+            <div className="flex flex-wrap gap-2">
+              {SUBJECT_BUTTONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => !readOnly && toggleSubject(s)}
+                  disabled={readOnly}
+                  className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+                    selectedSubjects.includes(s)
+                      ? "bg-[#5044e3] text-white"
+                      : "bg-[#f1f4f9] text-[#757b82] hover:bg-[#e8eaf4] hover:text-[#5044e3]"
+                  } ${readOnly ? "cursor-default" : ""}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* 푸터 */}
+        <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-gray-100 px-8 py-5">
+          {readOnly ? (
+            <button
+              onClick={onClose}
+              className="rounded-xl bg-[#5044e3] px-6 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4035c8]"
+            >
+              닫기
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="rounded-xl border border-gray-200 px-6 py-2.5 text-[14px] font-medium text-[#757b82] transition hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                className="rounded-xl bg-[#5044e3] px-6 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4035c8] disabled:opacity-50"
+              >
+                {saving ? "저장 중…" : "완료"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 워크스페이스 모달 ────────────────────────────────────────────
 
 function WorkModal({ title, onClose }: { title: string; onClose: () => void }) {
@@ -403,6 +592,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [activePhase, setActivePhase] = useState("T");
   const [activeSection, setActiveSection] = useState("T-1");
   const [projectTitle, setProjectTitle] = useState("");
+  const [targetGrade, setTargetGrade] = useState("");
+  const [relatedSubjects, setRelatedSubjects] = useState("");
   const [titleSaveStatus, setTitleSaveStatus] = useState<"idle" | "saved">("idle");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -418,12 +609,18 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const activityStatusRef = useRef<Record<string, "active" | "completed" | "skipped">>({});
 
   // ── 의견묻기 ─────────────────────────────────────────────────
-  type Member = { id: string; name: string };
-  type OpinionData = { question: string; responses: Record<string, string>; submitted: Record<string, boolean>; hidden: boolean };
+  type Member = { id: string; name: string; avatarUrl: string | null };
+  // opinions: opinionKey(actCode__timestamp) → { question, hidden, actCode }
+  // opinionResponses: opinionKey → { userId → response }
   const [lessonMembers, setLessonMembers] = useState<Member[]>([]);
   const [opinionModal, setOpinionModal] = useState<string | null>(null); // activityCode
   const [opinionDraft, setOpinionDraft] = useState("");
-  const [opinions, setOpinions] = useState<Record<string, OpinionData>>({});
+  const [opinions, setOpinions] = useState<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
+  const [opinionResponses, setOpinionResponses] = useState<Record<string, Record<string, string>>>({});
+  const [myOpinionDrafts, setMyOpinionDrafts] = useState<Record<string, string>>({});
+  const [editingOpinions, setEditingOpinions] = useState<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const opinionChannelRef = useRef<any>(null);
   const [roleRows, setRoleRows] = useState<{ name: string; role: string }[]>([
     { name: "", role: "" }, { name: "", role: "" },
     { name: "", role: "" }, { name: "", role: "" },
@@ -435,7 +632,15 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   type RefFile = { name: string; mime: string; content?: string; pdfData?: string };
   const [referenceFiles, setReferenceFiles] = useState<RefFile[]>([]);
 
-  const isHost = true;
+  // ── 성취기준 ─────────────────────────────────────────────────
+  const [selectedStandards, setSelectedStandards] = useState<StandardItem[]>([]);
+
+  // ── 핵심아이디어 ──────────────────────────────────────────────
+  const [selectedIdeas, setSelectedIdeas] = useState<IdeaItem[]>([]);
+
+  const [isHost, setIsHost] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [ownerOffline, setOwnerOffline] = useState(false);
   const router = useRouter();
   const titleInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -451,7 +656,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const lastSnapshotTimeRef = useRef(0);
   const activityInputsRef = useRef<Record<string, string>>({});
   const userProfileRef = useRef<UserProfile | null>(null);
-  const opinionsRef = useRef<Record<string, OpinionData>>({});
 
   // ── 유저 프로필 로드 ─────────────────────────────────────────
   useEffect(() => {
@@ -482,25 +686,51 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       if (lessonRes.data) {
         setProjectTitle(lessonRes.data.title);
         setActivePhase(lessonRes.data.current_phase ?? "T");
+        setTargetGrade(lessonRes.data.target_grade ?? "");
+        setRelatedSubjects(lessonRes.data.related_subjects ?? "");
       }
 
       if (contentsRes.data) {
         const inputs: Record<string, string> = {};
         const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
+        const loadedOpinions: Record<string, { question: string; hidden: boolean; actCode: string }> = {};
+        const loadedOpinionResponses: Record<string, Record<string, string>> = {};
         for (const row of contentsRes.data) {
-          const c = row.content as { type: string; text?: string; rows?: { name: string; role: string }[]; status?: string };
+          const code = row.activity_code as string;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const c = row.content as any;
+          if (code.endsWith("__opinion")) {
+            if (c?.active !== false && c?.question) {
+              const opinionKey = code.slice(0, -"__opinion".length);
+              // new format: actCode__timestamp, old format: actCode (no timestamp)
+              const m = opinionKey.match(/^(.+)__(\d+)$/);
+              const actCodeFromKey = m ? m[1] : opinionKey;
+              loadedOpinions[opinionKey] = { question: c.question, hidden: false, actCode: actCodeFromKey };
+            }
+            continue;
+          }
+          const resIdx = code.indexOf("__opinion_res_");
+          if (resIdx !== -1) {
+            const opinionKey = code.slice(0, resIdx);
+            const uid = code.slice(resIdx + "__opinion_res_".length);
+            if (!loadedOpinionResponses[opinionKey]) loadedOpinionResponses[opinionKey] = {};
+            loadedOpinionResponses[opinionKey][uid] = c?.response ?? "";
+            continue;
+          }
           if (c.status === "completed" || c.status === "skipped") {
-            statusMap[row.activity_code] = c.status;
+            statusMap[code] = c.status;
           }
           if (c.type === "text" && c.text !== undefined) {
-            inputs[row.activity_code] = c.text;
-          } else if (c.type === "role_table" && row.activity_code === "T-2-1" && c.rows) {
+            inputs[code] = c.text;
+          } else if (c.type === "role_table" && code === "T-2-1" && c.rows) {
             setRoleRows(c.rows);
           }
         }
         setActivityInputs(inputs);
         setActivityStatus(statusMap);
         activityStatusRef.current = statusMap;
+        if (Object.keys(loadedOpinions).length > 0) setOpinions(loadedOpinions);
+        if (Object.keys(loadedOpinionResponses).length > 0) setOpinionResponses(loadedOpinionResponses);
       }
 
       // 최근 접근 시간 갱신
@@ -508,28 +738,151 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         .update({ last_accessed_at: new Date().toISOString() })
         .eq("id", lessonId);
 
-      // 레슨 멤버 로드
+      // 레슨 멤버 로드 + 현재 유저 역할 확인
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
       const membersRes = await supabase
         .from("lesson_members")
-        .select("user_id")
+        .select("user_id, role")
         .eq("lesson_id", lessonId);
       if (membersRes.data && membersRes.data.length > 0) {
+        const myRow = membersRes.data.find((m: { user_id: string; role: string }) => m.user_id === currentUserId);
+        setIsHost(myRow?.role === "owner");
         const ids = membersRes.data.map((m: { user_id: string }) => m.user_id);
         const profilesRes = await supabase
           .from("profiles")
-          .select("id, display_name")
+          .select("id, display_name, avatar_url")
           .in("id", ids);
         if (profilesRes.data) {
           setLessonMembers(
-            profilesRes.data.map((p: { id: string; display_name: string | null }) => ({
+            profilesRes.data.map((p: { id: string; display_name: string | null; avatar_url: string | null }) => ({
               id: p.id,
               name: p.display_name ?? "알 수 없음",
+              avatarUrl: p.avatar_url ?? null,
             }))
           );
         }
       }
     };
     load();
+
+    // ── Realtime + Presence 설정 (async IIFE로 감싸서 await 사용 가능하게)
+    const supabaseRt = createClient();
+    // cleanup용 ref — IIFE 내에서 할당 후 cleanup에서 참조
+    let rtChannel: ReturnType<typeof supabaseRt.channel> | null = null;
+    let presenceChannel: ReturnType<typeof supabaseRt.channel> | null = null;
+    let opinionChannel: ReturnType<typeof supabaseRt.channel> | null = null;
+
+    (async () => {
+      // ── 의견묻기 Broadcast 채널 (publication 설정 불필요) ──────
+      opinionChannel = supabaseRt
+        .channel(`opinions:${lessonId}`)
+        .on("broadcast", { event: "question" }, ({ payload }) => {
+          const { opinionKey, actCode, question } = payload as { opinionKey: string; actCode: string; question: string };
+          setOpinions((prev) => ({ ...prev, [opinionKey]: { question, hidden: false, actCode } }));
+        })
+        .on("broadcast", { event: "delete_question" }, ({ payload }) => {
+          const { opinionKey } = payload as { opinionKey: string };
+          setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+          setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+        })
+        .on("broadcast", { event: "response" }, ({ payload }) => {
+          const { opinionKey, userId, response } = payload as { opinionKey: string; userId: string; response: string };
+          setOpinionResponses((prev) => ({
+            ...prev,
+            [opinionKey]: { ...(prev[opinionKey] ?? {}), [userId]: response },
+          }));
+        })
+        .subscribe();
+      opinionChannelRef.current = opinionChannel;
+
+      // Realtime: 다른 참여자의 activity_contents 텍스트 변경 실시간 반영
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handleContentChange = (payload: any) => {
+        const row = payload.new as { lesson_id: string; activity_code: string; content: Record<string, unknown> };
+        if (row.lesson_id !== lessonId) return;
+        const { activity_code, content } = row;
+        // 의견 관련 코드는 Broadcast로 처리 → 무시
+        if (activity_code.includes("__opinion")) return;
+        // 일반 텍스트
+        if ((content as { text?: string })?.text !== undefined) {
+          setActivityInputs((prev) => ({ ...prev, [activity_code]: (content as { text: string }).text }));
+        }
+      };
+
+      rtChannel = supabaseRt
+        .channel(`activity-contents:${lessonId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "activity_contents" },
+          handleContentChange
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "activity_contents" },
+          handleContentChange
+        )
+        .subscribe();
+
+      // Presence: 소유자 오프라인 감지
+      const [lessonData, { data: { user: me } }] = await Promise.all([
+        supabaseRt.from("lessons").select("owner_id").eq("id", lessonId).single(),
+        supabaseRt.auth.getUser(),
+      ]);
+      const ownerId = lessonData.data?.owner_id;
+      const amOwner = me?.id === ownerId;
+
+      presenceChannel = supabaseRt.channel(`presence:${lessonId}`, {
+        config: { presence: { key: me?.id ?? "anon" } },
+      });
+      presenceChannel
+        .on("presence", { event: "sync" }, () => {
+          if (amOwner) return;
+          const state = presenceChannel!.presenceState<{ userId: string }>();
+          const ownerOnline = Object.values(state).some((arr) =>
+            arr.some((u) => u.userId === ownerId)
+          );
+          setOwnerOffline(!ownerOnline);
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED" && me) {
+            await presenceChannel!.track({ userId: me.id, role: amOwner ? "owner" : "member" });
+          }
+        });
+    })();
+
+    return () => {
+      if (rtChannel) supabaseRt.removeChannel(rtChannel);
+      if (presenceChannel) supabaseRt.removeChannel(presenceChannel);
+      if (opinionChannel) supabaseRt.removeChannel(opinionChannel);
+    };
+  }, [lessonId]);
+
+  // ── lesson_members Realtime: 새 멤버 합류 시 아바타 즉시 반영 ──
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`lesson_members:${lessonId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "lesson_members", filter: `lesson_id=eq.${lessonId}` },
+        async (payload) => {
+          const newUserId = (payload.new as { user_id: string }).user_id;
+          const { data } = await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_url")
+            .eq("id", newUserId)
+            .single();
+          if (data) {
+            setLessonMembers((prev) => {
+              if (prev.some((m) => m.id === data.id)) return prev;
+              return [...prev, { id: data.id, name: data.display_name ?? "알 수 없음", avatarUrl: data.avatar_url ?? null }];
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [lessonId]);
 
   // ── 버전 로드 ────────────────────────────────────────────────
@@ -613,9 +966,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       const status = activityStatusRef.current[code] ?? "active";
       contents[code] = { type: "text", text, status };
     }
-    if (Object.keys(opinionsRef.current).length > 0) {
-      contents["__opinions__"] = { type: "opinions", data: opinionsRef.current };
-    }
+
 
     const supabase = createClient();
     await supabase.from("lesson_snapshots").insert({
@@ -742,7 +1093,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   // 버전 생성 클로저용 ref 동기화
   useEffect(() => { activityInputsRef.current = activityInputs; }, [activityInputs]);
   useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
-  useEffect(() => { opinionsRef.current = opinions; }, [opinions]);
 
   // 세션 종료 시 미저장 내용 flush + 버전 생성 (keepalive fetch로 보장)
   useEffect(() => {
@@ -769,9 +1119,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         const status = activityStatusRef.current[code] ?? "active";
         contents[code] = { type: "text", text, status };
       }
-      if (Object.keys(opinionsRef.current).length > 0) {
-        contents["__opinions__"] = { type: "opinions", data: opinionsRef.current };
-      }
       fetch("/api/snapshot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -793,8 +1140,49 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
+      {/* 소유자 오프라인 알림 */}
+      {ownerOffline && !isHost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+          <div className="w-[400px] rounded-2xl bg-white p-8 shadow-2xl text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+              <svg className="h-7 w-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-[18px] font-bold text-gray-900">소유자가 오프라인 상태입니다</h2>
+            <p className="mb-6 text-[14px] text-gray-500">
+              소유자가 세션을 종료했습니다. 일부 기능이 제한될 수 있습니다.
+            </p>
+            <button
+              onClick={() => setOwnerOffline(false)}
+              className="w-full rounded-xl bg-[#5044e3] py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4035c8]"
+            >
+              계속 이용하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 공유 모달 */}
+      {shareModalOpen && (
+        <ShareModal lessonId={lessonId} onClose={() => setShareModalOpen(false)} />
+      )}
+
       {/* 워크스페이스 모달 */}
-      {activeModal === "버전 관리" ? (
+      {activeModal === "수업정보" ? (
+        <LessonInfoModal
+          lessonId={lessonId}
+          title={projectTitle}
+          targetGrade={targetGrade}
+          relatedSubjects={relatedSubjects}
+          onTitleChange={setProjectTitle}
+          onTargetGradeChange={setTargetGrade}
+          onRelatedSubjectsChange={setRelatedSubjects}
+          onClose={() => setActiveModal(null)}
+          readOnly={!isHost}
+        />
+      ) : activeModal === "버전 관리" ? (
         <VersionModal
           snapshots={snapshots}
           lessonId={lessonId}
@@ -803,7 +1191,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const supabase = createClient();
             await Promise.all(
               Object.entries(contents)
-                .filter(([code]) => code !== "__opinions__")
                 .map(([code, content]) =>
                   supabase.from("activity_contents").upsert(
                     { lesson_id: lessonId, activity_code: code, content },
@@ -814,10 +1201,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const inputs: Record<string, string> = {};
             const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
             for (const [code, c] of Object.entries(contents)) {
-              if (code === "__opinions__" && c.type === "opinions") {
-                setOpinions((c as { type: string; data: Record<string, OpinionData> }).data ?? {});
-                continue;
-              }
               if (c.text !== undefined) inputs[code] = c.text;
               if (c.status === "completed" || c.status === "skipped") statusMap[code] = c.status;
             }
@@ -826,6 +1209,20 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             activityStatusRef.current = statusMap;
             setActiveModal(null);
           }}
+        />
+      ) : activeModal === "성취기준" ? (
+        <StandardsModal
+          onClose={() => setActiveModal(null)}
+          selectedStandards={selectedStandards}
+          onSelectionChange={setSelectedStandards}
+          readOnly={!isHost}
+        />
+      ) : activeModal === "핵심아이디어" ? (
+        <IdeasModal
+          onClose={() => setActiveModal(null)}
+          selectedIdeas={selectedIdeas}
+          onSelectionChange={setSelectedIdeas}
+          readOnly={!isHost}
         />
       ) : activeModal === "참고자료" ? (
         <ReferenceModal
@@ -864,10 +1261,16 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     if (opinionDraft.trim() && opinionModal) {
-                      setOpinions((prev) => ({
-                        ...prev,
-                        [opinionModal]: { question: opinionDraft.trim(), responses: {}, submitted: {}, hidden: false },
-                      }));
+                      const actCode = opinionModal;
+                      const opinionKey = `${actCode}__${Date.now()}`;
+                      const q = opinionDraft.trim();
+                      // DB 저장 (페이지 새로고침 대비)
+                      createClient().from("activity_contents").insert(
+                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } }
+                      );
+                      // Broadcast로 모든 참여자에게 즉시 전파
+                      opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      setOpinions((prev) => ({ ...prev, [opinionKey]: { question: q, hidden: false, actCode } }));
                       setOpinionModal(null);
                       setOpinionDraft("");
                     }
@@ -888,10 +1291,16 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                   disabled={!opinionDraft.trim()}
                   onClick={() => {
                     if (opinionDraft.trim() && opinionModal) {
-                      setOpinions((prev) => ({
-                        ...prev,
-                        [opinionModal]: { question: opinionDraft.trim(), responses: {}, submitted: {}, hidden: false },
-                      }));
+                      const actCode = opinionModal;
+                      const opinionKey = `${actCode}__${Date.now()}`;
+                      const q = opinionDraft.trim();
+                      // DB 저장 (페이지 새로고침 대비)
+                      createClient().from("activity_contents").insert(
+                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } }
+                      );
+                      // Broadcast로 모든 참여자에게 즉시 전파
+                      opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      setOpinions((prev) => ({ ...prev, [opinionKey]: { question: q, hidden: false, actCode } }));
                       setOpinionModal(null);
                       setOpinionDraft("");
                     }
@@ -963,14 +1372,60 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             </div>
           </div>
         </div>
-        {/* 우: 액션 버튼 */}
+        {/* 우: 멤버 아바타 + 액션 버튼 */}
         <div className="flex shrink-0 items-center gap-3">
-          <button className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25">
+          {/* 전체 멤버 아바타 (본인 포함) */}
+          {(() => {
+            const me: Member | null = userProfile
+              ? { id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나", avatarUrl: userProfile.avatar_url ?? null }
+              : null;
+            const others = lessonMembers.filter((m) => m.id !== userProfile?.id);
+            const all = me ? [me, ...others] : others;
+            const colors = ["bg-[#3D5A7A]","bg-[#4A7A5A]","bg-[#7A5A3D]","bg-[#5A3D7A]","bg-[#7A3D5A]"];
+            return all.length > 0 ? (
+              <div className="flex items-center -space-x-2 mr-1">
+                {all.slice(0, 6).map((m, idx) => {
+                  let n = 0; for (let i = 0; i < m.id.length; i++) n += m.id.charCodeAt(i);
+                  const color = colors[n % colors.length];
+                  const isMe = idx === 0 && !!me;
+                  return (
+                    <div key={m.id} className="group relative">
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt={m.name}
+                          className={`h-8 w-8 rounded-full object-cover ${isMe ? "border-2 border-white" : "border-2 border-white/40"}`}
+                        />
+                      ) : (
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${color} text-[13px] font-bold text-white ${isMe ? "border-2 border-white" : "border-2 border-white/40"}`}>
+                          {m.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900/90 px-2 py-1 text-[12px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        {isMe ? `${m.name} (나)` : m.name}
+                      </div>
+                    </div>
+                  );
+                })}
+                {all.length > 6 && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-[12px] font-semibold text-white">
+                    +{all.length - 6}
+                  </div>
+                )}
+              </div>
+            ) : null;
+          })()}
+
+          <button
+            onClick={() => setShareModalOpen(true)}
+            className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25"
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
             공유
           </button>
+
           <button className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1015,14 +1470,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             {/* 설계도구 — 아코디언 */}
             <WorkNavButton
               icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
-              label="설계도구"
-              active={openAccordion === "설계도구"}
+              label="기본정보"
+              active={openAccordion === "기본정보"}
               collapsed={sidebarCollapsed}
-              onClick={() => setOpenAccordion(openAccordion === "설계도구" ? null : "설계도구")}
+              onClick={() => setOpenAccordion(openAccordion === "기본정보" ? null : "기본정보")}
             >
-              {openAccordion === "설계도구" && !sidebarCollapsed && (
+              {openAccordion === "기본정보" && !sidebarCollapsed && (
                 <div className="ml-2 mt-0.5 overflow-hidden rounded-xl bg-[#f8f9fd]">
-                  {["공유하기", "출력하기", "불러오기", "내보내기"].map((sub) => (
+                  {["수업정보", "성취기준", "핵심아이디어"].map((sub) => (
                     <button key={sub} onClick={() => setActiveModal(sub)}
                       className="w-full rounded-full px-4 py-2 text-left text-[15px] text-[#757b82] transition hover:text-[#5044e3]">
                       {sub}
@@ -1031,33 +1486,16 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 </div>
               )}
             </WorkNavButton>
-            {/* 버전 관리 — 바로 모달 */}
-            <WorkNavButton
-              icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              label="버전 관리"
-              active={activeModal === "버전 관리"}
-              collapsed={sidebarCollapsed}
-              onClick={() => { loadSnapshots(); setActiveModal("버전 관리"); }}
-            />
-            {/* 성취기준 — 아코디언 */}
-            <WorkNavButton
-              icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              label="성취기준"
-              active={openAccordion === "성취기준"}
-              collapsed={sidebarCollapsed}
-              onClick={() => setOpenAccordion(openAccordion === "성취기준" ? null : "성취기준")}
-            >
-              {openAccordion === "성취기준" && !sidebarCollapsed && (
-                <div className="ml-2 mt-0.5 overflow-hidden rounded-xl bg-[#f8f9fd]">
-                  {["검색하기", "추가하기"].map((sub) => (
-                    <button key={sub} onClick={() => setActiveModal(sub)}
-                      className="w-full rounded-full px-4 py-2 text-left text-[15px] text-[#757b82] transition hover:text-[#5044e3]">
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </WorkNavButton>
+            {/* 버전 관리 — 소유자만 */}
+            {isHost && (
+              <WorkNavButton
+                icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                label="버전 관리"
+                active={activeModal === "버전 관리"}
+                collapsed={sidebarCollapsed}
+                onClick={() => { loadSnapshots(); setActiveModal("버전 관리"); }}
+              />
+            )}
             {/* 참고자료 — 바로 모달 */}
             <WorkNavButton
               icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>}
@@ -1072,20 +1510,26 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {!sidebarCollapsed && <p className="mb-1.5 mt-5 px-3 text-[12px] font-semibold uppercase tracking-wider text-[#adb2ba]">설정</p>}
           {sidebarCollapsed && <div className="mb-1 mt-4 h-px bg-[#adb2ba]/30" />}
           <ul className="space-y-0.5">
-            <WorkNavButton
-              icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
-              label="권한관리"
-              active={activeModal === "권한관리"}
-              collapsed={sidebarCollapsed}
-              onClick={() => setActiveModal("권한관리")}
-            />
-            <WorkNavButton
-              icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>}
-              label="채팅관리"
-              active={activeModal === "채팅관리"}
-              collapsed={sidebarCollapsed}
-              onClick={() => setActiveModal("채팅관리")}
-            />
+            {/* 권한관리 — 소유자만 */}
+            {isHost && (
+              <WorkNavButton
+                icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
+                label="권한관리"
+                active={activeModal === "권한관리"}
+                collapsed={sidebarCollapsed}
+                onClick={() => setActiveModal("권한관리")}
+              />
+            )}
+            {/* 채팅관리 — 소유자만 */}
+            {isHost && (
+              <WorkNavButton
+                icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>}
+                label="채팅관리"
+                active={activeModal === "채팅관리"}
+                collapsed={sidebarCollapsed}
+                onClick={() => setActiveModal("채팅관리")}
+              />
+            )}
           </ul>
         </nav>
 
@@ -1284,12 +1728,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               건너뛰기
                             </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
-                              className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#ede9fb] hover:text-[#5044e3]"
-                            >
-                              의견묻기
-                            </button>
+                            {isHost && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
+                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#ede9fb] hover:text-[#5044e3]"
+                              >
+                                의견묻기
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1342,137 +1788,152 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                           />
                         )}
 
-                        {/* 의견묻기 섹션 */}
-                        {opinions[act.code] && (
-                          <div className="mt-4 rounded-xl border border-[#e0e2f0] bg-[#f8f9ff] p-4" onClick={(e) => e.stopPropagation()}>
-                            {/* 헤더: 질문 + 숨기기/삭제 버튼 */}
-                            <div className="mb-3 flex items-start justify-between gap-2">
-                              <div className="flex items-start gap-2 min-w-0">
-                                <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#5044e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <p className="text-[14px] font-semibold text-[#5044e3]">{opinions[act.code].question}</p>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-1">
-                                {/* 숨기기/보이기 */}
-                                <button
-                                  onClick={() =>
-                                    setOpinions((prev) => ({
-                                      ...prev,
-                                      [act.code]: { ...prev[act.code], hidden: !prev[act.code].hidden },
-                                    }))
-                                  }
-                                  title={opinions[act.code].hidden ? "보이기" : "숨기기"}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-[#e8eaf4] hover:text-[#5044e3]"
-                                >
-                                  {opinions[act.code].hidden ? (
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                    </svg>
-                                  ) : (
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                  )}
-                                </button>
-                                {/* 삭제 */}
-                                <button
-                                  onClick={() =>
-                                    setOpinions((prev) => {
-                                      const next = { ...prev };
-                                      delete next[act.code];
-                                      return next;
-                                    })
-                                  }
-                                  title="삭제"
-                                  className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-red-50 hover:text-red-400"
-                                >
-                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
+                        {/* 의견묻기 섹션 — opinionKey별로 스택 */}
+                        {Object.entries(opinions)
+                          .filter(([, o]) => o.actCode === act.code)
+                          .map(([opinionKey, opinionData]) => {
+                          const myId = userProfile?.id ?? "";
+                          const myResponse = opinionResponses[opinionKey]?.[myId];
+                          const hasSubmitted = !!myResponse;
+                          const allResponses = Object.entries(opinionResponses[opinionKey] ?? {});
+                          // 멤버 이름 조회 (소유자 포함)
+                          const allMembers = [
+                            ...(userProfile ? [{ id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나" }] : []),
+                            ...lessonMembers.filter((m) => m.id !== userProfile?.id),
+                          ];
+                          const getName = (uid: string) => allMembers.find((m) => m.id === uid)?.name ?? uid;
 
-                            {opinions[act.code].hidden ? null : (() => {
-                              const allSubmitted = lessonMembers.length > 0 && lessonMembers.every((m) => opinions[act.code].submitted[m.id]);
-                              if (allSubmitted) return (
-                              <div className="space-y-2.5">
-                                {lessonMembers
-                                  .filter((m) => opinions[act.code].responses[m.id]?.trim())
-                                  .map((member) => (
-                                    <div key={member.id} className="flex items-start gap-2">
-                                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-600">
-                                        {member.name.charAt(0)}
-                                      </div>
-                                      <div>
-                                        <p className="text-[13px] font-semibold text-[#2d3339]">{member.name}</p>
-                                        <p className="text-[14px] leading-snug text-[#5a6066]">{opinions[act.code].responses[member.id]}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                {lessonMembers.filter((m) => !opinions[act.code].responses[m.id]?.trim()).length > 0 && (
-                                  <p className="text-[12px] text-[#adb2ba]">
-                                    응답 없음: {lessonMembers.filter((m) => !opinions[act.code].responses[m.id]?.trim()).map((m) => m.name).join(", ")}
-                                  </p>
+                          return (
+                            <div key={opinionKey} className="mt-4 rounded-xl border border-[#e0e2f0] bg-[#f8f9ff] p-4" onClick={(e) => e.stopPropagation()}>
+                              {/* 헤더 */}
+                              <div className="mb-3 flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2 min-w-0">
+                                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#5044e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <p className="text-[14px] font-semibold text-[#5044e3]">{opinionData.question}</p>
+                                </div>
+                                {isHost && (
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <button
+                                      onClick={() => setOpinions((prev) => ({ ...prev, [opinionKey]: { ...prev[opinionKey], hidden: !prev[opinionKey].hidden } }))}
+                                      title={opinionData.hidden ? "보이기" : "숨기기"}
+                                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-[#e8eaf4] hover:text-[#5044e3]"
+                                    >
+                                      {opinionData.hidden
+                                        ? <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                        : <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                      }
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        createClient().from("activity_contents").update(
+                                          { content: { type: "opinion", question: opinionData.question, active: false } }
+                                        ).eq("lesson_id", lessonId).eq("activity_code", `${opinionKey}__opinion`);
+                                        opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
+                                        setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+                                        setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+                                      }}
+                                      title="삭제"
+                                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-red-50 hover:text-red-400"
+                                    >
+                                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                  </div>
                                 )}
                               </div>
-                              );
-                              return (
-                                <div className="space-y-2">
-                                  {lessonMembers.map((member) => {
-                                    const isSent = opinions[act.code].submitted[member.id];
-                                    return (
-                                      <div key={member.id} className="flex items-center gap-2">
-                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-600">
-                                          {member.name.charAt(0)}
-                                        </div>
-                                        <span className="w-16 shrink-0 truncate text-[13px] font-medium text-[#5a6066]">{member.name}</span>
-                                        {isSent ? (
-                                          <p className="flex-1 rounded-lg border border-[#dde3eb] bg-[#f8f9ff] px-3 py-1.5 text-[14px] text-[#5a6066]">
-                                            {opinions[act.code].responses[member.id] || "—"}
-                                          </p>
-                                        ) : (
-                                          <>
-                                            <input
-                                              value={opinions[act.code].responses[member.id] ?? ""}
-                                              onChange={(e) =>
-                                                setOpinions((prev) => ({
-                                                  ...prev,
-                                                  [act.code]: {
-                                                    ...prev[act.code],
-                                                    responses: { ...prev[act.code].responses, [member.id]: e.target.value },
-                                                  },
-                                                }))
-                                              }
-                                              placeholder="의견을 입력하세요…"
-                                              className="flex-1 rounded-lg border border-[#dde3eb] bg-white px-3 py-1.5 text-[14px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:border-[#5044e3]"
-                                            />
-                                            <button
-                                              onClick={() =>
-                                                setOpinions((prev) => ({
-                                                  ...prev,
-                                                  [act.code]: {
-                                                    ...prev[act.code],
-                                                    submitted: { ...prev[act.code].submitted, [member.id]: true },
-                                                  },
-                                                }))
-                                              }
-                                              className="shrink-0 rounded-lg bg-[#5044e3] px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4035c8]"
-                                            >
-                                              전송
-                                            </button>
-                                          </>
-                                        )}
+
+                              {!opinionData.hidden && (
+                                <div className="space-y-3">
+                                  {/* 내 답변 입력 (미제출이거나 수정 중) */}
+                                  {(!hasSubmitted || editingOpinions.has(opinionKey)) ? (
+                                    <div className="flex gap-2">
+                                      <input
+                                        value={myOpinionDrafts[opinionKey] ?? ""}
+                                        onChange={(e) => setMyOpinionDrafts((prev) => ({ ...prev, [opinionKey]: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            const resp = myOpinionDrafts[opinionKey]?.trim();
+                                            if (!resp) return;
+                                            createClient().from("activity_contents").upsert(
+                                              { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
+                                              { onConflict: "lesson_id,activity_code" }
+                                            );
+                                            opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                            setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
+                                            setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+                                            setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
+                                          }
+                                        }}
+                                        autoFocus={editingOpinions.has(opinionKey)}
+                                        placeholder="의견을 입력하세요…"
+                                        className="flex-1 rounded-lg border border-[#dde3eb] bg-white px-3 py-2 text-[14px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:border-[#5044e3]"
+                                      />
+                                      <button
+                                        disabled={!myOpinionDrafts[opinionKey]?.trim()}
+                                        onClick={() => {
+                                          const resp = myOpinionDrafts[opinionKey]?.trim();
+                                          if (!resp) return;
+                                          createClient().from("activity_contents").upsert(
+                                            { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
+                                            { onConflict: "lesson_id,activity_code" }
+                                          );
+                                          opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                          setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
+                                          setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+                                          setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
+                                        }}
+                                        className="shrink-0 rounded-lg bg-[#5044e3] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#4035c8] disabled:opacity-40"
+                                      >
+                                        전송
+                                      </button>
+                                    </div>
+                                  ) : null}
+
+                                  {/* 내 제출 답변 표시 + 수정 버튼 */}
+                                  {hasSubmitted && !editingOpinions.has(opinionKey) && (
+                                    <div className="flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2">
+                                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-200 text-xs font-semibold text-indigo-700">
+                                        {getName(myId).charAt(0)}
                                       </div>
-                                    );
-                                  })}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-semibold text-indigo-600">나의 답변</p>
+                                        <p className="text-[14px] leading-snug text-[#2d3339]">{myResponse}</p>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          setMyOpinionDrafts((prev) => ({ ...prev, [opinionKey]: myResponse ?? "" }));
+                                          setEditingOpinions((prev) => new Set([...prev, opinionKey]));
+                                        }}
+                                        className="shrink-0 rounded-md border border-[#dde3eb] bg-white px-2 py-1 text-[12px] font-medium text-[#5a6066] transition hover:bg-gray-50"
+                                      >
+                                        수정
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* 다른 사람 답변 목록 */}
+                                  {allResponses.filter(([uid, r]) => uid !== myId && r.trim()).length > 0 && (
+                                    <div className="space-y-2">
+                                      {allResponses.filter(([uid, r]) => uid !== myId && r.trim()).map(([uid, resp]) => (
+                                        <div key={uid} className="flex items-start gap-2">
+                                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                                            {getName(uid).charAt(0)}
+                                          </div>
+                                          <div>
+                                            <p className="text-[12px] font-semibold text-[#5a6066]">{getName(uid)}</p>
+                                            <p className="text-[14px] leading-snug text-[#2d3339]">{resp}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              );
-                            })()}
-                          </div>
-                        )}
+                              )}
+                            </div>
+                          );
+                        })}
 
                       </div>
                     );
@@ -1517,14 +1978,38 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               <ChatInterface
                 stage={activePhase}
                 onReady={() => setAiReady(true)}
-                pageContext={{
-                  projectTitle,
-                  activePhase,
-                  activeSection,
-                  activityInputs,
-                  selectedActivityCode: selectedActivityCode ?? undefined,
-                  referenceFiles: referenceFiles.length > 0 ? referenceFiles : undefined,
-                }}
+                pageContext={(() => {
+                  // 의견묻기 데이터를 멤버 이름으로 매핑
+                  const allMembers = [
+                    ...(userProfile ? [{ id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나" }] : []),
+                    ...lessonMembers.filter((m) => m.id !== userProfile?.id),
+                  ];
+                  const opinionsForContext = Object.entries(opinions).reduce<
+                    { activityCode: string; question: string; responses: { name: string; text: string }[] }[]
+                  >((acc, [opKey, data]) => {
+                    const named = Object.entries(opinionResponses[opKey] ?? {})
+                      .filter(([, text]) => text.trim())
+                      .map(([memberId, text]) => {
+                        const member = allMembers.find((m) => m.id === memberId);
+                        return { name: member?.name ?? memberId, text };
+                      });
+                    if (named.length > 0) {
+                      acc.push({ activityCode: data.actCode, question: data.question, responses: named });
+                    }
+                    return acc;
+                  }, []);
+                  return {
+                    projectTitle,
+                    activePhase,
+                    activeSection,
+                    activityInputs,
+                    selectedActivityCode: selectedActivityCode ?? undefined,
+                    referenceFiles: referenceFiles.length > 0 ? referenceFiles : undefined,
+                    selectedStandards: selectedStandards.length > 0 ? selectedStandards : undefined,
+                    selectedIdeas: selectedIdeas.length > 0 ? selectedIdeas : undefined,
+                    opinions: opinionsForContext.length > 0 ? opinionsForContext : undefined,
+                  };
+                })()}
                 lessonId={lessonId}
                 userId={userProfile?.id ?? ""}
               />

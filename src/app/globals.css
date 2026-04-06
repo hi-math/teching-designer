@@ -5,6 +5,18 @@
   --foreground: #171717;
 }
 
+html {
+  zoom: 0.85;
+}
+
+/* zoom 적용 시 vh가 재계산되지 않는 문제 보정 */
+.h-screen {
+  height: calc(100vh / 0.85) !important;
+}
+.min-h-screen {
+  min-height: calc(100vh / 0.85) !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

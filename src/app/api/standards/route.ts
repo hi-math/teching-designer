@@ -10,8 +10,26 @@ function handleMeta(params: URLSearchParams) {
   const filtered = standards
     .filter((s) => !subject || s.subject_group === subject || s.subject === subject);
 
-  const subjects = [...new Set(standards.map((s) => s.subject_group).filter(Boolean))].sort();
-  const domains  = [...new Set(filtered.map((s) => s.domain).filter(Boolean))].sort();
+  // 교과: 첫 등장 order 기준 정렬
+  const subjectOrderMap = new Map<string, number>();
+  for (const s of standards) {
+    if (s.subject_group && !subjectOrderMap.has(s.subject_group)) {
+      subjectOrderMap.set(s.subject_group, s.order);
+    }
+  }
+  const subjects = [...subjectOrderMap.keys()].sort(
+    (a, b) => (subjectOrderMap.get(a) ?? 0) - (subjectOrderMap.get(b) ?? 0)
+  );
+
+  // 영역: 필터된 결과에서 첫 등장 순서 유지 (배열 순)
+  const seen = new Set<string>();
+  const domains: string[] = [];
+  for (const s of filtered) {
+    if (s.domain && !seen.has(s.domain)) {
+      seen.add(s.domain);
+      domains.push(s.domain);
+    }
+  }
 
   return Response.json({ subjects, domains });
 }
@@ -38,7 +56,7 @@ function handleSearch(params: URLSearchParams) {
       .sort((a, b) => b.score - a.score)
       .map((x) => x.s);
   } else {
-    results = results.slice(0, limit);
+    results = results.sort((a, b) => a.order - b.order);
   }
 
   return Response.json(results.slice(0, limit));

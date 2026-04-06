@@ -11,6 +11,9 @@ interface PageContext {
   activityInputs: Record<string, string>;
   selectedActivityCode?: string;
   referenceFiles?: { name: string; mime: string; content?: string; pdfData?: string }[];
+  selectedStandards?: { code: string; subject: string; domain: string; content: string }[];
+  selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
+  opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
 }
 
 interface Props {

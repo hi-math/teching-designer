@@ -43,6 +43,9 @@ interface PageContext {
   activityInputs?: Record<string, string>;
   selectedActivityCode?: string;
   referenceFiles?: { name: string; mime: string; content?: string; pdfData?: string }[];
+  selectedStandards?: { code: string; subject: string; domain: string; content: string }[];
+  selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
+  opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
 }
 
 export function buildPageContextBlock(ctx: PageContext): string {
@@ -80,6 +83,41 @@ export function buildPageContextBlock(ctx: PageContext): string {
     for (const [code, value] of filled) {
       lines.push(`**[${code}]**`);
       lines.push(value.trim());
+    }
+  }
+
+  if (ctx.opinions && ctx.opinions.length > 0) {
+    lines.push('');
+    lines.push('### 팀원 의견 (의견묻기 결과)');
+    lines.push('팀원들이 아래 활동 카드에 대해 의견을 제출했습니다. 이 의견들을 충분히 반영하여 팀의 현재 관심사·방향성·고민을 이해하고, 그에 맞춘 구체적인 조언과 제안을 제공하세요.');
+    for (const op of ctx.opinions) {
+      lines.push('');
+      lines.push(`**[${op.activityCode}] 질문: "${op.question}"**`);
+      for (const r of op.responses) {
+        lines.push(`- ${r.name}: ${r.text}`);
+      }
+    }
+  }
+
+  if (ctx.selectedStandards && ctx.selectedStandards.length > 0) {
+    lines.push('');
+    lines.push('### 수업 성취기준 (핵심 목표)');
+    lines.push('아래 성취기준을 이 수업설계의 핵심 목표로 삼아, 모든 단계(목표 진술·평가 계획·학습활동 설계 등)에 일관되게 반영하세요.');
+    for (const s of ctx.selectedStandards) {
+      const domainPart = s.domain ? ` · ${s.domain}` : '';
+      lines.push(`**${s.code}** (${s.subject}${domainPart})`);
+      lines.push(s.content);
+    }
+  }
+
+  if (ctx.selectedIdeas && ctx.selectedIdeas.length > 0) {
+    lines.push('');
+    lines.push('### 수업 핵심아이디어 (개념적 토대)');
+    lines.push('아래 핵심아이디어는 이 수업이 지향하는 개념적·원리적 토대입니다. 학습목표 진술, 문제 상황 설계, 학습활동 구성 시 이 핵심아이디어가 학습자에게 내면화될 수 있도록 반영하세요.');
+    for (const idea of ctx.selectedIdeas) {
+      const domainPart = idea.domain ? ` · ${idea.domain}` : '';
+      lines.push(`**${idea.subject}${domainPart}**`);
+      lines.push(idea.content);
     }
   }
 

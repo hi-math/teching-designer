@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm() {
@@ -11,13 +11,17 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
+  const afterLoginPath = inviteToken ? `/invite/${inviteToken}` : "/dashboard";
 
   const handleGoogleLogin = async () => {
     const supabase = createClient();
+    const next = inviteToken ? `/invite/${inviteToken}` : "/dashboard";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
   };
@@ -36,7 +40,7 @@ export default function LoginForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(afterLoginPath);
   };
 
   return (

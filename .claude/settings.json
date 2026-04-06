@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const d=require\\('./public/standard/standards_middle.json'\\); const subjects=[...new Set\\(d.standards.map\\(s=>s.subject\\)\\)].sort\\(\\); console.log\\(JSON.stringify\\(subjects\\)\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"const d=require\\('./public/standard/ideas.json'\\); console.log\\(Object.keys\\(d\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const d=JSON.parse\\(fs.readFileSync\\('./public/standard/ideas.json','utf8'\\)\\); console.log\\(Object.keys\\(d\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const d=JSON.parse\\(fs.readFileSync\\('./public/standard/standards_middle.json','utf8'\\)\\); const seen=new Map\\(\\); for\\(const s of d.standards\\){ if\\(!seen.has\\(s.subject_group\\)\\) seen.set\\(s.subject_group,s.order\\); } const sorted=[...seen.entries\\(\\)].sort\\(\\(a,b\\)=>a[1]-b[1]\\); console.log\\(sorted.map\\(x=>x[0]\\)\\);\")",
+      "Bash(npx next:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\PC\\Documents\\asone-projects\\minerva\\src\\app\\api\\lessons"
+    ]
+  }
+}

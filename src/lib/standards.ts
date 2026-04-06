@@ -5,6 +5,7 @@ import path from 'path';
 
 export interface Standard {
   code: string;
+  order: number;
   subject_group: string;
   subject: string;
   grade_group: string;

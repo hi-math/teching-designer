@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
 
   // Google OAuth 코드 교환
   if (code) {
-    const response = NextResponse.redirect(`${origin}/dashboard`);
+    const next = searchParams.get("next") ?? "/dashboard";
+    const safePath = next.startsWith("/") ? next : "/dashboard";
+    const response = NextResponse.redirect(`${origin}${safePath}`);
     const supabase = createSupabase(response);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
