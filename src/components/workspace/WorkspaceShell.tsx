@@ -697,7 +697,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const activityStatusRef = useRef<Record<string, "active" | "completed" | "skipped">>({});
 
   // ── 의견묻기 ─────────────────────────────────────────────────
-  type Member = { id: string; name: string; avatarUrl: string | null };
+  type Member = { id: string; name: string; email: string; avatarUrl: string | null };
   // opinions: opinionKey(actCode__timestamp) → { question, hidden, actCode }
   // opinionResponses: opinionKey → { userId → response }
   const [lessonMembers, setLessonMembers] = useState<Member[]>([]);
@@ -727,6 +727,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [selectedIdeas, setSelectedIdeas] = useState<IdeaItem[]>([]);
 
   const [isHost, setIsHost] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<Permissions>({
     phaseNav: false, complete: true, skip: true, opinion: true, titleEdit: false,
   });
@@ -845,13 +846,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         const ids = membersRes.data.map((m: { user_id: string }) => m.user_id);
         const profilesRes = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url")
+          .select("id, display_name, email, avatar_url")
           .in("id", ids);
         if (profilesRes.data) {
           setLessonMembers(
-            profilesRes.data.map((p: { id: string; display_name: string | null; avatar_url: string | null }) => ({
+            profilesRes.data.map((p: { id: string; display_name: string | null; email: string | null; avatar_url: string | null }) => ({
               id: p.id,
-              name: p.display_name ?? "알 수 없음",
+              name: p.display_name ?? p.email ?? "알 수 없음",
+              email: p.email ?? "",
               avatarUrl: p.avatar_url ?? null,
             }))
           );
@@ -964,12 +966,23 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       });
       presenceChannel
         .on("presence", { event: "sync" }, () => {
-          if (amOwner) return;
           const state = presenceChannel!.presenceState<{ userId: string }>();
-          const ownerOnline = Object.values(state).some((arr) =>
-            arr.some((u) => u.userId === ownerId)
-          );
-          setOwnerOffline(!ownerOnline);
+          const ids: string[] = [];
+          Object.values(state).forEach((arr) => arr.forEach((u) => ids.push(u.userId)));
+          setOnlineUserIds(ids);
+          if (!amOwner) setOwnerOffline(!ids.includes(ownerId ?? ""));
+        })
+        .on("presence", { event: "join" }, ({ newPresences }) => {
+          setOnlineUserIds((prev) => {
+            const next = [...prev];
+            newPresences.forEach((p: { userId: string }) => { if (!next.includes(p.userId)) next.push(p.userId); });
+            return next;
+          });
+        })
+        .on("presence", { event: "leave" }, ({ leftPresences }) => {
+          const leftIds = leftPresences.map((p: { userId: string }) => p.userId);
+          setOnlineUserIds((prev) => prev.filter((id) => !leftIds.includes(id)));
+          if (!amOwner && leftIds.includes(ownerId ?? "")) setOwnerOffline(true);
         })
         .subscribe(async (status) => {
           if (status === "SUBSCRIBED" && me) {
@@ -998,13 +1011,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           const newUserId = (payload.new as { user_id: string }).user_id;
           const { data } = await supabase
             .from("profiles")
-            .select("id, display_name, avatar_url")
+            .select("id, display_name, email, avatar_url")
             .eq("id", newUserId)
             .single();
           if (data) {
             setLessonMembers((prev) => {
               if (prev.some((m) => m.id === data.id)) return prev;
-              return [...prev, { id: data.id, name: data.display_name ?? "알 수 없음", avatarUrl: data.avatar_url ?? null }];
+              return [...prev, { id: data.id, name: data.display_name ?? data.email ?? "알 수 없음", email: data.email ?? "", avatarUrl: data.avatar_url ?? null }];
             });
           }
         }
@@ -1197,6 +1210,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
   const handleLeave = () => {
     setMenuOpen(false);
+    router.refresh();
     router.push("/dashboard");
   };
 
@@ -1302,7 +1316,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
       {/* 공유 모달 */}
       {shareModalOpen && (
-        <ShareModal lessonId={lessonId} onClose={() => setShareModalOpen(false)} />
+        <ShareModal
+          lessonId={lessonId}
+          members={[
+            ...(userProfile ? [{ id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나", email: userProfile.email ?? "", avatarUrl: userProfile.avatar_url ?? null }] : []),
+            ...lessonMembers.filter((m) => m.id !== userProfile?.id),
+          ]}
+          onClose={() => setShareModalOpen(false)}
+        />
       )}
 
       {/* 워크스페이스 모달 */}
@@ -1477,16 +1498,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           <span className="shrink-0 text-[15px] font-black tracking-widest text-white/80 uppercase">로고</span>
           <div className={`shrink-0 ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`} />
           {/* 저장 표식 + 타이틀 */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div
-              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[2.5px] border-white/70 transition-opacity duration-300"
-              style={{ opacity: titleSaveStatus === "saved" ? 1 : 0 }}
+              className={`relative inline-grid rounded-lg px-2.5 py-1 border transition-colors duration-200 ${
+                !isHost && !permissions.titleEdit
+                  ? "border-transparent"
+                  : "border-white/20 hover:border-white/40 focus-within:border-white/60"
+              }`}
             >
-              <svg className="h-2.5 w-2.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="relative inline-grid">
               <span
                 aria-hidden="true"
                 className="invisible col-start-1 row-start-1 whitespace-pre text-[22px] font-extrabold tracking-tight"
@@ -1503,18 +1522,27 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                   setTitleSaveStatus("idle");
                   if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
                   titleTimerRef.current = setTimeout(() => {
-                    setTitleSaveStatus("saved");
                     if (val.trim() && lessonId) {
-                      createClient().from("lessons").update({ title: val }).eq("id", lessonId);
+                      createClient().from("lessons").update({ title: val }).eq("id", lessonId)
+                        .then(({ error }) => { if (error) console.error('[title] DB save error:', error.message); });
                       workspaceChannelRef.current?.send({ type: "broadcast", event: "title_change", payload: { title: val } });
                     }
-                  }, 1000);
+                    setTitleSaveStatus("saved");
+                    setTimeout(() => setTitleSaveStatus("idle"), 1500);
+                  }, 800);
                 }}
                 readOnly={!isHost && !permissions.titleEdit}
                 placeholder="제목 없음"
                 className={`col-start-1 row-start-1 w-full bg-transparent text-[22px] font-extrabold text-white outline-none tracking-tight placeholder-white/40 ${!isHost && !permissions.titleEdit ? "cursor-default" : ""}`}
               />
             </div>
+            {/* 저장 상태 메시지 */}
+            <span
+              className="text-[12px] text-white/70 whitespace-nowrap transition-opacity duration-700"
+              style={{ opacity: titleSaveStatus === "saved" ? 1 : 0 }}
+            >
+              변경사항이 저장되었습니다
+            </span>
           </div>
         </div>
         {/* 우: 멤버 아바타 + 액션 버튼 */}
@@ -1522,9 +1550,11 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {/* 전체 멤버 아바타 (본인 포함) */}
           {(() => {
             const me: Member | null = userProfile
-              ? { id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나", avatarUrl: userProfile.avatar_url ?? null }
+              ? { id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나", email: userProfile.email ?? "", avatarUrl: userProfile.avatar_url ?? null }
               : null;
-            const others = lessonMembers.filter((m) => m.id !== userProfile?.id);
+            const onlineSet = new Set(onlineUserIds);
+            // 온라인 유저만 표시 (Presence 미등록 상태면 본인만)
+            const others = lessonMembers.filter((m) => m.id !== userProfile?.id && onlineSet.has(m.id));
             const all = me ? [me, ...others] : others;
             const colors = ["bg-[#3D5A7A]","bg-[#4A7A5A]","bg-[#7A5A3D]","bg-[#5A3D7A]","bg-[#7A3D5A]"];
             return all.length > 0 ? (

@@ -4,11 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 
 type EmailStatus = 'idle' | 'loading' | 'success' | 'not_found' | 'already_member' | 'self_invite' | 'invalid';
 
+type MemberInfo = { id: string; name: string; email: string; avatarUrl: string | null };
+
 export default function ShareModal({
   lessonId,
+  members = [],
   onClose,
 }: {
   lessonId: string;
+  members?: MemberInfo[];
   onClose: () => void;
 }) {
   const [email, setEmail] = useState('');
@@ -122,6 +126,40 @@ export default function ShareModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {/* 현재 공유 중인 멤버 */}
+          {members.length > 0 && (
+            <div>
+              <p className="mb-2 text-[13px] font-medium text-[#757b82]">공유 중인 멤버 ({members.length})</p>
+              <div className="space-y-2">
+                {members.map((m, idx) => {
+                  let n = 0; for (let i = 0; i < m.id.length; i++) n += m.id.charCodeAt(i);
+                  const colors = ["bg-[#3D5A7A]","bg-[#4A7A5A]","bg-[#7A5A3D]","bg-[#5A3D7A]","bg-[#7A3D5A]"];
+                  const color = colors[n % colors.length];
+                  return (
+                    <div key={m.id} className="flex items-center gap-3">
+                      {m.avatarUrl ? (
+                        <img src={m.avatarUrl} alt={m.name} className="h-8 w-8 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${color} text-[13px] font-bold text-white`}>
+                          {m.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-medium text-[#2d3339]">
+                          {m.name}{idx === 0 ? <span className="ml-1.5 text-[11px] font-normal text-[#adb2ba]">(소유자)</span> : null}
+                        </p>
+                        <p className="truncate text-[12px] text-[#757b82]">{m.email}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 구분선 */}
+          {members.length > 0 && <div className="h-px bg-[#e2e5ea]" />}
+
           {/* 이메일로 직접 초대 */}
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-[#757b82]">
