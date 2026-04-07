@@ -975,12 +975,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         .on("presence", { event: "join" }, ({ newPresences }) => {
           setOnlineUserIds((prev) => {
             const next = [...prev];
-            newPresences.forEach((p: { userId: string }) => { if (!next.includes(p.userId)) next.push(p.userId); });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (newPresences as any[]).forEach((p) => { if (p.userId && !next.includes(p.userId)) next.push(p.userId); });
             return next;
           });
         })
         .on("presence", { event: "leave" }, ({ leftPresences }) => {
-          const leftIds = leftPresences.map((p: { userId: string }) => p.userId);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const leftIds = (leftPresences as any[]).map((p) => p.userId as string).filter(Boolean);
           setOnlineUserIds((prev) => prev.filter((id) => !leftIds.includes(id)));
           if (!amOwner && leftIds.includes(ownerId ?? "")) setOwnerOffline(true);
         })
