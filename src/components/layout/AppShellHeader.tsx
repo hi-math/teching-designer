@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 /** 레이아웃만 (배경·하단선은 style로 테마별 지정) */
 export const appShellHeaderClassName =
-  "flex min-h-[4.75rem] shrink-0 items-center justify-between px-6";
+  "flex min-h-[3.75rem] shrink-0 items-center justify-between px-6";
 
 type AppShellHeaderProps = {
   children: ReactNode;
