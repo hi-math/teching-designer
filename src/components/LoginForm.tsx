@@ -41,6 +41,7 @@ export default function LoginForm() {
     }
 
     router.push(afterLoginPath);
+    router.refresh(); // 서버 컴포넌트가 새 세션을 인식하도록 강제 갱신
   };
 
   return (
@@ -176,7 +177,10 @@ export default function LoginForm() {
         {/* 회원가입 링크 */}
         <p className="mt-6 text-center text-sm text-gray-500">
           계정이 없으신가요?{" "}
-          <a href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <a
+            href={inviteToken ? `/signup?invite=${inviteToken}` : "/signup"}
+            className="font-medium text-indigo-600 hover:text-indigo-500"
+          >
             회원가입
           </a>
         </p>

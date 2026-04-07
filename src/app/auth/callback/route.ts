@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  // Vercel 프록시 환경에서 request.url이 내부 URL일 수 있으므로 환경변수 우선 사용
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin).replace(/\/$/, '');
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
@@ -52,7 +54,9 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabase(response);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
+    console.error('[auth/callback] exchangeCodeForSession failed:', error.message);
+    return NextResponse.redirect(`${origin}/?error=auth&reason=${encodeURIComponent(error.message)}`);
   }
 
-  return NextResponse.redirect(`${origin}/?error=auth`);
+  return NextResponse.redirect(`${origin}/?error=auth&reason=no_code`);
 }

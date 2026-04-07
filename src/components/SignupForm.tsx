@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupForm() {
@@ -16,6 +16,9 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
+  const afterSignupPath = inviteToken ? `/invite/${inviteToken}` : "/dashboard";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -27,12 +30,12 @@ export default function SignupForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
         data: {
-          name: form.name,
+          display_name: form.name, // trigger가 display_name 키를 최우선으로 읽음
           school: form.school,
           subject: form.subject,
         },
@@ -40,12 +43,25 @@ export default function SignupForm() {
     });
 
     if (error) {
-      setError(error.message);
+      // Supabase가 직접 중복 에러를 반환하는 경우
+      if (error.message.toLowerCase().includes("already registered") || error.message.toLowerCase().includes("already been registered")) {
+        setError("이미 사용 중인 이메일입니다. 로그인해 주세요.");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
 
-    router.push("/dashboard");
+    // 이메일 확인이 활성화된 경우 Supabase는 error 없이 identities: [] 반환
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setError("이미 사용 중인 이메일입니다. 로그인해 주세요.");
+      setLoading(false);
+      return;
+    }
+
+    router.push(afterSignupPath);
+    router.refresh();
   };
 
   return (

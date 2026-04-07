@@ -80,11 +80,11 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     if (profileCache.current[userId]) return profileCache.current[userId];
     const { data } = await createClient()
       .from('profiles')
-      .select('display_name, avatar_url')
+      .select('display_name, email, avatar_url')
       .eq('id', userId)
       .single();
     const profile = {
-      name: data?.display_name ?? '알 수 없음',
+      name: data?.display_name ?? data?.email ?? '알 수 없음',
       avatarUrl: data?.avatar_url ?? null,
     };
     profileCache.current[userId] = profile;
