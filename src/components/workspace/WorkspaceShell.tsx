@@ -683,6 +683,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [targetGrade, setTargetGrade] = useState("");
   const [relatedSubjects, setRelatedSubjects] = useState("");
   const [titleSaveStatus, setTitleSaveStatus] = useState<"idle" | "saved">("idle");
+  const [titleFocused, setTitleFocused] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1502,10 +1503,10 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {/* 저장 표식 + 타이틀 */}
           <div className="flex items-center gap-3">
             <div
-              className={`relative inline-grid rounded-lg px-2.5 py-1 border transition-colors duration-200 ${
-                !isHost && !permissions.titleEdit
-                  ? "border-transparent"
-                  : "border-white/20 hover:border-white/40 focus-within:border-white/60"
+              className={`relative inline-grid rounded-lg px-2.5 py-1 transition-all duration-150 ${
+                titleFocused && (isHost || permissions.titleEdit)
+                  ? "border-[2px] border-white/80 bg-white/15 shadow-[0_0_0_3px_rgba(255,255,255,0.12)]"
+                  : "border-[2px] border-transparent"
               }`}
             >
               <span
@@ -1517,6 +1518,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               <input
                 ref={titleInputRef}
                 value={projectTitle}
+                onFocus={() => (isHost || permissions.titleEdit) && setTitleFocused(true)}
+                onBlur={() => setTitleFocused(false)}
                 onChange={(e) => {
                   if (!isHost && !permissions.titleEdit) return;
                   const val = e.target.value;
@@ -1530,7 +1533,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                       workspaceChannelRef.current?.send({ type: "broadcast", event: "title_change", payload: { title: val } });
                     }
                     setTitleSaveStatus("saved");
-                    setTimeout(() => setTitleSaveStatus("idle"), 1500);
+                    setTimeout(() => setTitleSaveStatus("idle"), 1000);
                   }, 800);
                 }}
                 readOnly={!isHost && !permissions.titleEdit}
@@ -1540,7 +1543,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             </div>
             {/* 저장 상태 메시지 */}
             <span
-              className="text-[12px] text-white/70 whitespace-nowrap transition-opacity duration-700"
+              className="text-[12px] text-white/70 whitespace-nowrap transition-opacity duration-500"
               style={{ opacity: titleSaveStatus === "saved" ? 1 : 0 }}
             >
               변경사항이 저장되었습니다
