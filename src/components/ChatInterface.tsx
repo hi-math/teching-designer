@@ -39,9 +39,14 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // auth UID를 ref로 캐시 — 소유자/참여자 모두 동일하게 auth.uid() 사용
+  const authUidRef = useRef<string | null>(null);
 
-  // API 연결 확인 (마운트 시 1회)
+  // 마운트 시: auth UID 캐시 + API 연결 확인
   useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user) authUidRef.current = data.user.id;
+    });
     fetch('/api/chat')
       .then((r) => r.ok && onReady?.())
       .catch(() => {});
@@ -58,17 +63,19 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
   // 단계 전환 시 DB에서 대화 기록 로드
   useEffect(() => {
-    if (!lessonId || !userId) {
+    if (!lessonId) {
       setMessages([]);
       setTimestamps([]);
       return;
     }
     const load = async () => {
+      const loadUid = authUidRef.current || userId;
+      if (!loadUid) return;
       const { data } = await createClient()
         .from('ai_messages')
         .select('role, content, created_at')
         .eq('lesson_id', lessonId)
-        .eq('user_id', userId)
+        .eq('user_id', loadUid)
         .eq('context_activity_code', stage)
         .order('created_at', { ascending: true });
       if (!data) return;
@@ -104,14 +111,17 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
     abortRef.current = new AbortController();
 
-    // 사용자 메시지 DB 저장
-    if (lessonId && userId) {
+    // 사용자 메시지 DB 저장 (authUidRef 우선, 없으면 prop userId)
+    const saveUid = authUidRef.current || userId;
+    if (lessonId && saveUid) {
       createClient().from('ai_messages').insert({
         lesson_id: lessonId,
-        user_id: userId,
+        user_id: saveUid,
         role: 'user',
         content: text.trim(),
         context_activity_code: stage,
+      }).then(({ error }) => {
+        if (error) console.error('[ai_messages] user insert error:', error.message);
       });
     }
 
@@ -160,13 +170,15 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       }
 
       // AI 응답 DB 저장 (스트리밍 완료 후)
-      if (lessonId && userId && accumulated) {
+      if (lessonId && saveUid && accumulated) {
         createClient().from('ai_messages').insert({
           lesson_id: lessonId,
-          user_id: userId,
+          user_id: saveUid,
           role: 'assistant',
           content: accumulated,
           context_activity_code: stage,
+        }).then(({ error }) => {
+          if (error) console.error('[ai_messages] assistant insert error:', error.message);
         });
       }
     } catch (err) {

@@ -574,7 +574,6 @@ function PermissionsModal({
     { key: "phaseNav", label: "단계 이동", desc: "ON: 참여자가 상위 탭으로 단계를 자유롭게 이동할 수 있습니다. OFF: 소유자의 단계를 따라갑니다." },
     { key: "complete", label: "완료", desc: "ON: 참여자가 카드의 완료 버튼을 사용할 수 있습니다." },
     { key: "skip", label: "건너뛰기", desc: "ON: 참여자가 카드의 건너뛰기 버튼을 사용할 수 있습니다." },
-    { key: "opinion", label: "의견묻기", desc: "ON: 소유자가 의견묻기 버튼을 카드에서 사용할 수 있습니다." },
     { key: "titleEdit", label: "제목 수정", desc: "ON: 모든 사용자가 프로젝트 제목을 수정할 수 있습니다." },
   ];
 
@@ -935,6 +934,20 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "activity_contents" },
           handleContentChange
+        )
+        .on(
+          "postgres_changes",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { event: "UPDATE", schema: "public", table: "lessons", filter: `id=eq.${lessonId}` } as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (payload: any) => {
+            const row = payload.new as { id: string; title?: string; current_phase?: string; permissions?: Permissions };
+            if (row.id !== lessonId) return;
+            // 다른 참여자가 변경한 경우만 반영 (소유자 본인은 로컬 업데이트 이미 반영됨)
+            if (row.title !== undefined) setProjectTitle((prev) => prev === row.title ? prev : row.title!);
+            if (row.current_phase !== undefined) setActivePhase((prev) => prev === row.current_phase ? prev : row.current_phase!);
+            if (row.permissions !== undefined) setPermissions((prev) => JSON.stringify(prev) === JSON.stringify(row.permissions) ? prev : row.permissions!);
+          }
         )
         .subscribe();
 
@@ -1865,7 +1878,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               건너뛰기
                             </button>
-                            {isHost && permissions.opinion && (
+                            {isHost && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
                                 className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#ede9fb] hover:text-[#5044e3]"
