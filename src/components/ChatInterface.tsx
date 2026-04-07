@@ -68,6 +68,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
         .from('ai_messages')
         .select('role, content, created_at')
         .eq('lesson_id', lessonId)
+        .eq('user_id', userId)
         .eq('context_activity_code', stage)
         .order('created_at', { ascending: true });
       if (!data) return;

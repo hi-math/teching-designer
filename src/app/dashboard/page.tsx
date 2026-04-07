@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 
@@ -6,6 +7,8 @@ export default async function Dashboard() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) redirect("/");
 
   const meta = user?.user_metadata ?? {};
   const profile = {

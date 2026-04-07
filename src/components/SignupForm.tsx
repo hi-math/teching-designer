@@ -14,6 +14,7 @@ export default function SignupForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,16 +54,51 @@ export default function SignupForm() {
       return;
     }
 
-    // 이메일 확인이 활성화된 경우 Supabase는 error 없이 identities: [] 반환
+    // 이메일 확인이 활성화된 경우 Supabase는 error 없이 identities: [] 반환 (중복 이메일)
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
       setError("이미 사용 중인 이메일입니다. 로그인해 주세요.");
       setLoading(false);
       return;
     }
 
-    router.push(afterSignupPath);
+    // 이메일 인증이 필요한 경우: user는 생성되었지만 session이 null
+    if (data.user && !data.session) {
+      setConfirmationSent(true);
+      setLoading(false);
+      return;
+    }
+
     router.refresh();
+    router.push(afterSignupPath);
   };
+
+  if (confirmationSent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-4 text-2xl font-bold text-gray-900">LOGO</div>
+          <div className="rounded-2xl bg-white px-8 py-10 shadow-sm ring-1 ring-gray-200">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50">
+              <svg className="h-7 w-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-xl font-bold text-gray-900">이메일을 확인해주세요</h2>
+            <p className="mb-1 text-sm text-gray-600">
+              <span className="font-semibold text-indigo-600">{form.email}</span> 으로
+            </p>
+            <p className="mb-6 text-sm text-gray-600">인증 링크를 보냈습니다. 링크를 클릭하면 로그인됩니다.</p>
+            <a
+              href="/"
+              className="inline-block w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
+            >
+              로그인 페이지로 이동
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12">

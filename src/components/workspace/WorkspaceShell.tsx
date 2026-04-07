@@ -549,6 +549,95 @@ function WorkModal({ title, onClose }: { title: string; onClose: () => void }) {
   );
 }
 
+// ─── 권한관리 모달 ────────────────────────────────────────────────
+
+type Permissions = { phaseNav: boolean; complete: boolean; skip: boolean; opinion: boolean; titleEdit: boolean };
+
+function PermissionsModal({
+  permissions,
+  onChange,
+  onClose,
+}: {
+  permissions: Permissions;
+  onChange: (p: Permissions) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const toggle = (key: keyof Permissions) => onChange({ ...permissions, [key]: !permissions[key] });
+
+  const items: { key: keyof Permissions; label: string; desc: string }[] = [
+    { key: "phaseNav", label: "단계 이동", desc: "ON: 참여자가 상위 탭으로 단계를 자유롭게 이동할 수 있습니다. OFF: 소유자의 단계를 따라갑니다." },
+    { key: "complete", label: "완료", desc: "ON: 참여자가 카드의 완료 버튼을 사용할 수 있습니다." },
+    { key: "skip", label: "건너뛰기", desc: "ON: 참여자가 카드의 건너뛰기 버튼을 사용할 수 있습니다." },
+    { key: "opinion", label: "의견묻기", desc: "ON: 소유자가 의견묻기 버튼을 카드에서 사용할 수 있습니다." },
+    { key: "titleEdit", label: "제목 수정", desc: "ON: 모든 사용자가 프로젝트 제목을 수정할 수 있습니다." },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-[520px] rounded-2xl border border-gray-200 bg-white shadow-xl">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 text-[#5044e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <h2 className="text-[17px] font-semibold text-gray-900">권한 관리</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 권한 목록 */}
+        <div className="divide-y divide-gray-100 px-6 py-2">
+          {items.map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-4 py-4">
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold text-[#2d3339]">{label}</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-[#757b82]">{desc}</p>
+              </div>
+              {/* 토글 스위치 */}
+              <button
+                type="button"
+                onClick={() => toggle(key)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${permissions[key] ? "bg-[#5044e3]" : "bg-gray-200"}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${permissions[key] ? "translate-x-6" : "translate-x-1"}`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* 푸터 */}
+        <div className="border-t border-gray-100 px-6 py-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-[#5044e3] px-5 py-2 text-[14px] font-semibold text-white transition hover:bg-[#4035c8]"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────
 
 function WorkNavButton({
@@ -639,6 +728,11 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [selectedIdeas, setSelectedIdeas] = useState<IdeaItem[]>([]);
 
   const [isHost, setIsHost] = useState(false);
+  const [permissions, setPermissions] = useState<Permissions>({
+    phaseNav: false, complete: true, skip: true, opinion: true, titleEdit: false,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const workspaceChannelRef = useRef<any>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [ownerOffline, setOwnerOffline] = useState(false);
   const router = useRouter();
@@ -688,6 +782,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         setActivePhase(lessonRes.data.current_phase ?? "T");
         setTargetGrade(lessonRes.data.target_grade ?? "");
         setRelatedSubjects(lessonRes.data.related_subjects ?? "");
+        if (lessonRes.data.permissions) setPermissions(lessonRes.data.permissions as Permissions);
       }
 
       if (contentsRes.data) {
@@ -772,6 +867,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     let rtChannel: ReturnType<typeof supabaseRt.channel> | null = null;
     let presenceChannel: ReturnType<typeof supabaseRt.channel> | null = null;
     let opinionChannel: ReturnType<typeof supabaseRt.channel> | null = null;
+    let workspaceChannel: ReturnType<typeof supabaseRt.channel> | null = null;
 
     (async () => {
       // 세션이 준비될 때까지 대기 (첫 렌더 시 auth 미초기화 방지)
@@ -798,6 +894,21 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         })
         .subscribe();
       opinionChannelRef.current = opinionChannel;
+
+      // Workspace Broadcast: permissions + phase_change + title_change
+      workspaceChannel = supabaseRt
+        .channel(`workspace:${lessonId}`)
+        .on("broadcast", { event: "permissions" }, ({ payload }) => {
+          setPermissions(payload as Permissions);
+        })
+        .on("broadcast", { event: "phase_change" }, ({ payload }) => {
+          setActivePhase((payload as { phase: string }).phase);
+        })
+        .on("broadcast", { event: "title_change" }, ({ payload }) => {
+          setProjectTitle((payload as { title: string }).title);
+        })
+        .subscribe();
+      workspaceChannelRef.current = workspaceChannel;
 
       // Realtime: 다른 참여자의 activity_contents 텍스트 변경 실시간 반영
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -858,6 +969,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       if (rtChannel) supabaseRt.removeChannel(rtChannel);
       if (presenceChannel) supabaseRt.removeChannel(presenceChannel);
       if (opinionChannel) supabaseRt.removeChannel(opinionChannel);
+      if (workspaceChannel) supabaseRt.removeChannel(workspaceChannel);
     };
   }, [lessonId]);
 
@@ -1056,10 +1168,18 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   }, [scheduleSave]);
 
 
-  // ── 단계 변경 (DB 저장 포함) ─────────────────────────────────
+  // ── 단계 변경 (DB 저장 + Broadcast) ────────────────────────────
   const handlePhaseChange = useCallback(async (phase: string) => {
     setActivePhase(phase);
     await createClient().from("lessons").update({ current_phase: phase }).eq("id", lessonId);
+    workspaceChannelRef.current?.send({ type: "broadcast", event: "phase_change", payload: { phase } });
+  }, [lessonId]);
+
+  // ── 권한 변경 (소유자만) ─────────────────────────────────────
+  const handlePermissionsChange = useCallback(async (newPerms: Permissions) => {
+    setPermissions(newPerms);
+    await createClient().from("lessons").update({ permissions: newPerms }).eq("id", lessonId);
+    workspaceChannelRef.current?.send({ type: "broadcast", event: "permissions", payload: newPerms });
   }, [lessonId]);
 
   const handleLeave = () => {
@@ -1233,6 +1353,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           onClose={() => setActiveModal(null)}
           onFilesChange={loadReferenceFiles}
         />
+      ) : activeModal === "권한관리" ? (
+        <PermissionsModal
+          permissions={permissions}
+          onChange={handlePermissionsChange}
+          onClose={() => setActiveModal(null)}
+        />
       ) : activeModal ? (
         <WorkModal title={activeModal} onClose={() => setActiveModal(null)} />
       ) : null}
@@ -1358,6 +1484,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 ref={titleInputRef}
                 value={projectTitle}
                 onChange={(e) => {
+                  if (!isHost && !permissions.titleEdit) return;
                   const val = e.target.value;
                   setProjectTitle(val);
                   setTitleSaveStatus("idle");
@@ -1366,11 +1493,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                     setTitleSaveStatus("saved");
                     if (val.trim() && lessonId) {
                       createClient().from("lessons").update({ title: val }).eq("id", lessonId);
+                      workspaceChannelRef.current?.send({ type: "broadcast", event: "title_change", payload: { title: val } });
                     }
                   }, 1000);
                 }}
+                readOnly={!isHost && !permissions.titleEdit}
                 placeholder="제목 없음"
-                className="col-start-1 row-start-1 w-full bg-transparent text-[22px] font-extrabold text-white outline-none tracking-tight placeholder-white/40"
+                className={`col-start-1 row-start-1 w-full bg-transparent text-[22px] font-extrabold text-white outline-none tracking-tight placeholder-white/40 ${!isHost && !permissions.titleEdit ? "cursor-default" : ""}`}
               />
             </div>
           </div>
@@ -1637,12 +1766,15 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                       return (
                         <div key={phase.code} className="flex items-center gap-2">
                           <button
-                            onClick={() => handlePhaseChange(phase.code)}
-                            className="flex w-40 items-center gap-2.5 rounded-full pl-2 pr-4 py-2 transition-all"
+                            onClick={() => {
+                              if (!isHost && !permissions.phaseNav) return;
+                              handlePhaseChange(phase.code);
+                            }}
+                            className={`flex w-40 items-center gap-2.5 rounded-full pl-2 pr-4 py-2 transition-all ${!isHost && !permissions.phaseNav ? "cursor-default" : ""}`}
                             style={{
                               backgroundColor: status === 'active' ? '#5044e3' : '#f1f4f9',
                             }}
-                            onMouseEnter={(e) => { if (status !== 'active') e.currentTarget.style.backgroundColor = '#e8eaf0'; }}
+                            onMouseEnter={(e) => { if (status !== 'active' && (isHost || permissions.phaseNav)) e.currentTarget.style.backgroundColor = '#e8eaf0'; }}
                             onMouseLeave={(e) => { if (status !== 'active') e.currentTarget.style.backgroundColor = '#f1f4f9'; }}
                           >
                             <span
@@ -1713,25 +1845,27 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                           <div className="flex flex-row gap-1.5">
                             <button
                               onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "completed" ? "active" : "completed"); }}
+                              disabled={!isHost && !permissions.complete}
                               className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                 st === "completed"
                                   ? "bg-[#bae0ff] text-[#0369a1]"
                                   : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
-                              }`}
+                              } ${!isHost && !permissions.complete ? "opacity-40 cursor-not-allowed" : ""}`}
                             >
                               완료
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "skipped" ? "active" : "skipped"); }}
+                              disabled={!isHost && !permissions.skip}
                               className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                 st === "skipped"
                                   ? "bg-[#e2e4ea] text-[#5a6066]"
                                   : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
-                              }`}
+                              } ${!isHost && !permissions.skip ? "opacity-40 cursor-not-allowed" : ""}`}
                             >
                               건너뛰기
                             </button>
-                            {isHost && (
+                            {isHost && permissions.opinion && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
                                 className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#ede9fb] hover:text-[#5044e3]"
