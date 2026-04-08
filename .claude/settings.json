@@ -13,7 +13,11 @@
       "Read(//c/Users/PC/Documents/asone-projects/**)",
       "Bash(npm ls:*)",
       "Bash(sed -n '1,20p' \"c:/Users/PC/Documents/asone-projects/minerva/src/components/workspace/StandardsModal.tsx\")",
-      "Bash(sed -n '1,20p' \"c:/Users/PC/Documents/asone-projects/minerva/src/components/workspace/IdeasModal.tsx\")"
+      "Bash(sed -n '1,20p' \"c:/Users/PC/Documents/asone-projects/minerva/src/components/workspace/IdeasModal.tsx\")",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs"
     ],
     "additionalDirectories": [
       "c:\\Users\\PC\\Documents\\asone-projects\\minerva\\src\\app\\api\\lessons",
