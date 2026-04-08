@@ -787,6 +787,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workspaceChannelRef = useRef<any>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [ownerOffline, setOwnerOffline] = useState(false);
   const router = useRouter();
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -1702,11 +1703,41 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             공유
           </button>
 
-          <button className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            출력
+          <button
+            onClick={async () => {
+              if (pdfLoading) return;
+              setPdfLoading(true);
+              try {
+                const res = await fetch(`/api/pdf?lessonId=${lessonId}`);
+                if (!res.ok) throw new Error(await res.text());
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${projectTitle || "report"}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error("[pdf]", e);
+                alert("PDF 생성 중 오류가 발생했습니다.");
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+            disabled={pdfLoading}
+            className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25 disabled:opacity-60"
+          >
+            {pdfLoading ? (
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            )}
+            {pdfLoading ? "생성 중…" : "출력"}
           </button>
         </div>
       </AppShellHeader>
