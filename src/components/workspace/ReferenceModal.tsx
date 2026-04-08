@@ -49,7 +49,7 @@ function FileTypeIcon({ mime }: { mime?: string }) {
     </div>
   );
   if (mime.includes("sheet") || mime.includes("excel") || mime.includes("csv")) return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600">
+    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M3 14h18M10 3v18M6 3h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z" />
       </svg>

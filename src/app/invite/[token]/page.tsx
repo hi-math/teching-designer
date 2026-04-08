@@ -67,7 +67,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
         {/* 로고 */}
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#5044e3] to-[#6c63ff] text-white font-bold text-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#5044e3] to-[#44c4b8] text-white font-bold text-lg">
             M
           </div>
           <span className="text-[18px] font-bold text-[#2d3339]">Minerva</span>

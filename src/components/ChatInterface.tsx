@@ -210,7 +210,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#6c63ff] text-xs font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#44c4b8] text-xs font-bold text-white">
               M
             </div>
             <p className="text-sm font-semibold text-[#2d3339]">Minerva AI</p>
@@ -263,7 +263,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           {!isStreaming && input.trim() && (
             <button
               onClick={() => sendMessage(input)}
-              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#4335d6] text-white transition hover:opacity-90"
+              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#44c4b8] text-white transition hover:opacity-90"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

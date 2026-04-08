@@ -2153,7 +2153,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               >
                 Minerva AI
                 {aiReady && (
-                  <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                  <span className="h-2 w-2 rounded-full bg-[#44c4b8] shrink-0" />
                 )}
               </button>
             </div>

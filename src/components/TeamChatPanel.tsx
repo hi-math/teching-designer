@@ -68,7 +68,9 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [sending, setSending] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -137,7 +139,6 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       if (!data) return;
       const converted = await Promise.all(data.map((row) => toMessage(row, data)));
 
-      // 리액션 로드
       const ids = converted.map((m) => m.id);
       if (ids.length > 0) {
         const { data: rdata } = await supabase
@@ -171,15 +172,10 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       .channel(`team_messages:${lessonId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'team_messages',
-        },
+        { event: 'INSERT', schema: 'public', table: 'team_messages' },
         async (payload) => {
           const row = payload.new as { id: string; lesson_id: string; user_id: string; content: string; created_at: string; reply_to: string | null };
           if (row.lesson_id !== lessonId) return;
-          // 자신이 보낸 메시지는 sendMessage에서 이미 낙관적으로 추가했으므로 skip
           if (row.user_id === currentUserId) return;
           const msg = await toMessage(row, [row]);
           setMessages((prev) => [...prev, msg]);
@@ -262,6 +258,15 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, [reactionPickerFor]);
 
+  // ── 답장 대상 메시지로 스크롤 ────────────────────────────────
+  const scrollToMessage = useCallback((msgId: string) => {
+    const el = document.getElementById(`msg-${msgId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedId(msgId);
+    setTimeout(() => setHighlightedId(null), 1500);
+  }, []);
+
   // ── 메시지 전송 ──────────────────────────────────────────────
   const sendMessage = async () => {
     const text = input.trim();
@@ -271,7 +276,6 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     const now = new Date().toISOString();
     const profile = await getProfile(currentUserId);
 
-    // 낙관적 업데이트
     const tempId = `temp-${Date.now()}`;
     const optimistic: ChatMessage = {
       id: tempId,
@@ -302,7 +306,6 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
 
     setSending(false);
 
-    // 낙관적 id → 실제 id 교체
     if (!error && data) {
       setMessages((prev) =>
         prev.map((m) => m.id === tempId ? { ...m, id: data.id } : m)
@@ -317,12 +320,11 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     }
   };
 
-  // ── 반응 토글 (DB 저장 + 낙관적 업데이트) ──────────────────
+  // ── 반응 토글 ──────────────────────────────────────────────
   const toggleReaction = async (messageId: string, emoji: string) => {
     const msg = messages.find((m) => m.id === messageId);
     const alreadyReacted = !!msg?.reactions[emoji]?.reactedByMe;
 
-    // 낙관적 업데이트
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== messageId) return m;
@@ -340,18 +342,12 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     setReactionPickerFor(null);
     setPickerPos(null);
 
-    // DB 저장
     const supabase = createClient();
     if (alreadyReacted) {
-      await supabase
-        .from('team_message_reactions')
-        .delete()
-        .eq('message_id', messageId)
-        .eq('user_id', currentUserId)
-        .eq('emoji', emoji);
+      await supabase.from('team_message_reactions').delete()
+        .eq('message_id', messageId).eq('user_id', currentUserId).eq('emoji', emoji);
     } else {
-      await supabase
-        .from('team_message_reactions')
+      await supabase.from('team_message_reactions')
         .insert({ message_id: messageId, user_id: currentUserId, emoji });
     }
   };
@@ -366,6 +362,10 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     setPickerPos({ top: rect.top - 48, left: rect.left - 100 });
     setReactionPickerFor(msgId);
   };
+
+  // ── 공통 액션 버튼 ──────────────────────────────────────────
+  const EmojiBtn = ({ msgId, e }: { msgId: string; e: React.MouseEvent<HTMLButtonElement> | null }) => null;
+  void EmojiBtn;
 
   // ── 렌더 ────────────────────────────────────────────────────
 
@@ -392,7 +392,11 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       )}
 
       {/* 메시지 목록 */}
-      <div className="flex-1 overflow-y-auto px-3 py-4" onClick={() => setReplyTo(null)}>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-3 py-4"
+        onClick={() => setReplyTo(null)}
+      >
         {messages.map((msg, i) => {
           const isMe = msg.userId === currentUserId;
           const prev = messages[i - 1];
@@ -401,6 +405,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           const isLast  = !next || next.userId !== msg.userId;
           const hasReactions = Object.keys(msg.reactions).length > 0;
           const isHovered  = hoveredId === msg.id;
+          const isHighlighted = highlightedId === msg.id;
           const color = avatarColor(msg.userId);
 
           void isLast;
@@ -409,37 +414,43 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           if (isMe) {
             return (
               <div
+                id={`msg-${msg.id}`}
                 key={msg.id}
-                className={isFirst ? 'mt-3' : 'mt-0.5'}
+                className={`${isFirst ? 'mt-3' : 'mt-0.5'} rounded-xl transition-colors duration-300 ${isHighlighted ? 'bg-indigo-50' : ''}`}
                 onMouseEnter={() => setHoveredId(msg.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
                 <div className="flex justify-end items-end gap-1.5 pr-1">
+                  {/* 답장 버튼 — 왼쪽 끝 */}
                   {isHovered && (
-                    <div className="flex items-center gap-1 shrink-0 self-end mb-1">
-                      <button
-                        onClick={(e) => openPicker(e, msg.id)}
-                        title="반응 추가"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
-                      >🙂</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
-                        title="답장"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                      </button>
-                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
+                      title="답장"
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 shrink-0 self-end mb-1"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </button>
                   )}
                   <span className="shrink-0 text-xs text-[#9AAAC0] self-end mb-1">{msg.timestamp}</span>
+                  {/* 이모지 버튼 — 버블 바로 왼쪽 */}
+                  {isHovered && (
+                    <button
+                      onClick={(e) => openPicker(e, msg.id)}
+                      title="반응 추가"
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50 shrink-0 self-end mb-1"
+                    >🙂</button>
+                  )}
                   <div className="max-w-[70%]">
                     {msg.replyTo && (
-                      <div className="mb-1 rounded-xl rounded-tr-sm bg-[#2C4F6A] border-l-[3px] border-[#6E9EC0] px-3 py-1.5">
-                        <p className="text-[12px] font-semibold text-[#9BC4E0]">{msg.replyTo.senderName}의 메시지</p>
-                        <p className="text-[13px] text-white/60 truncate">{msg.replyTo.content}</p>
-                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); scrollToMessage(msg.replyTo!.id); }}
+                        className="mb-1 w-full text-left rounded-xl rounded-tr-sm bg-[#ede9fb] border-l-[3px] border-[#5044e3] px-3 py-1.5 hover:bg-[#e4dff8] transition-colors cursor-pointer"
+                      >
+                        <p className="text-[12px] font-semibold text-[#5044e3]">{msg.replyTo.senderName}의 메시지</p>
+                        <p className="text-[13px] text-[#7c72d6] truncate">{msg.replyTo.content}</p>
+                      </button>
                     )}
                     <div className="rounded-2xl rounded-tr-sm bg-[#5044e3] px-4 py-2.5 text-[16px] leading-relaxed text-white">
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -466,8 +477,9 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           /* ── 팀원 메시지 (왼쪽) ── */
           return (
             <div
+              id={`msg-${msg.id}`}
               key={msg.id}
-              className={isFirst ? 'mt-3' : 'mt-0.5'}
+              className={`${isFirst ? 'mt-3' : 'mt-0.5'} rounded-xl transition-colors duration-300 ${isHighlighted ? 'bg-indigo-50' : ''}`}
               onMouseEnter={() => setHoveredId(msg.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -492,10 +504,13 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                   <div className="flex items-end gap-1.5">
                     <div className="max-w-[70%]">
                       {msg.replyTo && (
-                        <div className="mb-1 rounded-xl rounded-tl-sm border-l-[3px] border-[#9AAAC0] bg-[#DDE5EF] px-3 py-1.5">
-                          <p className="text-[12px] font-semibold text-[#6B7A99]">{msg.replyTo.senderName}의 메시지</p>
-                          <p className="text-[13px] text-[#6B7A99] truncate">{msg.replyTo.content}</p>
-                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); scrollToMessage(msg.replyTo!.id); }}
+                          className="mb-1 w-full text-left rounded-xl rounded-tl-sm border-l-[3px] border-[#a0aec0] bg-[#f0f4f9] px-3 py-1.5 hover:bg-[#e6edf5] transition-colors cursor-pointer"
+                        >
+                          <p className="text-[12px] font-semibold text-[#5a6a88]">{msg.replyTo.senderName}의 메시지</p>
+                          <p className="text-[13px] text-[#7a8aa8] truncate">{msg.replyTo.content}</p>
+                        </button>
                       )}
                       <div className="rounded-2xl rounded-tl-sm bg-[#e9eaec] px-4 py-2.5 text-[16px] leading-relaxed text-[#2d3339]">
                         <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -514,24 +529,26 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                         </div>
                       )}
                     </div>
-                    <span className="shrink-0 text-xs text-[#B0BEDA] self-end mb-1">{msg.timestamp}</span>
+                    {/* 이모지 버튼 — 버블 바로 오른쪽 */}
                     {isHovered && (
-                      <div className="flex items-center gap-1 shrink-0 self-end mb-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
-                          title="답장"
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => openPicker(e, msg.id)}
-                          title="반응 추가"
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
-                        >🙂</button>
-                      </div>
+                      <button
+                        onClick={(e) => openPicker(e, msg.id)}
+                        title="반응 추가"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50 shrink-0 self-end mb-1"
+                      >🙂</button>
+                    )}
+                    <span className="shrink-0 text-xs text-[#B0BEDA] self-end mb-1">{msg.timestamp}</span>
+                    {/* 답장 버튼 — 오른쪽 끝 */}
+                    {isHovered && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
+                        title="답장"
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 shrink-0 self-end mb-1"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -545,9 +562,9 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       {/* 답장 미리보기 */}
       {replyTo && (
         <div className="shrink-0 bg-white px-4 pt-2 pb-0 flex items-center gap-2">
-          <div className="flex-1 min-w-0 rounded-xl bg-[#D8E3EF] border-l-[3px] border-[#3D5A7A] px-3 py-1.5">
-            <p className="text-[13px] font-semibold text-[#3D5A7A]">{replyTo.senderName}에게 답장</p>
-            <p className="text-[13px] text-[#5A6A80] truncate">{replyTo.content}</p>
+          <div className="flex-1 min-w-0 rounded-xl bg-[#f0f2ff] border-l-[3px] border-[#5044e3] px-3 py-1.5">
+            <p className="text-[13px] font-semibold text-[#5044e3]">{replyTo.senderName}에게 답장</p>
+            <p className="text-[13px] text-[#7c72d6] truncate">{replyTo.content}</p>
           </div>
           <button
             onClick={() => setReplyTo(null)}

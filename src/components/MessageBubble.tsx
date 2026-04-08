@@ -37,21 +37,21 @@ export default function MessageBubble({ message, isFirst, isLast, isStreaming, t
     <div className={`flex items-start gap-3 ${isFirst ? 'mt-4' : 'mt-2'}`}>
       <div className="w-7 shrink-0 pt-0.5">
         {isFirst && (
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#6c63ff] text-[11px] font-bold text-white">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#44c4b8] text-[11px] font-bold text-white">
             M
           </div>
         )}
       </div>
       <div className="flex-1 min-w-0">
         {isFirst && (
-          <p className="mb-1.5 text-[14px] font-semibold text-[#5044e3]">Minerva AI</p>
+          <p className="mb-1.5 text-[14px] font-semibold text-[#35afa3]">Minerva AI</p>
         )}
         {isStreaming && !message.content ? (
           <div className="flex gap-1 py-1">
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
-                className="h-1.5 w-1.5 rounded-full bg-[#5044e3]/40 animate-bounce"
+                className="h-1.5 w-1.5 rounded-full bg-[#44c4b8] animate-bounce"
                 style={{ animationDelay: `${i * 0.15}s` }}
               />
             ))}

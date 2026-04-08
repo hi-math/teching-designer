@@ -91,7 +91,7 @@ export default function ShareModal({
   const statusMessage: Record<EmailStatus, { text: string; color: string } | null> = {
     idle: null,
     loading: null,
-    success: { text: `${invitedName}님을 멤버로 추가했습니다.`, color: 'text-green-600' },
+    success: { text: `${invitedName}님을 멤버로 추가했습니다.`, color: 'text-[#35afa3]' },
     not_found: { text: '해당 이메일의 계정을 찾을 수 없습니다.', color: 'text-red-500' },
     already_member: { text: '이미 이 프로젝트의 멤버입니다.', color: 'text-amber-600' },
     self_invite: { text: '본인을 초대할 수 없습니다.', color: 'text-amber-600' },
@@ -227,7 +227,7 @@ export default function ShareModal({
                 <button
                   onClick={copy}
                   className={`shrink-0 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition ${
-                    copied ? 'bg-green-500 text-white' : 'bg-[#f1f4f9] text-[#5044e3] hover:bg-[#ede9fb]'
+                    copied ? 'bg-[#44c4b8] text-white' : 'bg-[#f1f4f9] text-[#5044e3] hover:bg-[#ede9fb]'
                   }`}
                 >
                   {copied ? '복사됨 ✓' : '복사'}
