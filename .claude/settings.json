@@ -11,7 +11,9 @@
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\PC\\\\Documents\\\\asone-projects\\\\minerva && npx supabase db push 2>&1\")",
       "Read(//c/Users/PC/AppData/Local/Temp/**)",
       "Read(//c/Users/PC/Documents/asone-projects/**)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(sed -n '1,20p' \"c:/Users/PC/Documents/asone-projects/minerva/src/components/workspace/StandardsModal.tsx\")",
+      "Bash(sed -n '1,20p' \"c:/Users/PC/Documents/asone-projects/minerva/src/components/workspace/IdeasModal.tsx\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\PC\\Documents\\asone-projects\\minerva\\src\\app\\api\\lessons",

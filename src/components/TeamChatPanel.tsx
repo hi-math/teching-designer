@@ -66,7 +66,6 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const [sending, setSending] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
@@ -251,7 +250,6 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     const handler = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setReactionPickerFor(null);
-        setPickerPos(null);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -320,16 +318,25 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     }
   };
 
-  // ── 반응 토글 ──────────────────────────────────────────────
+  // ── 반응 토글 (한 사용자 = 한 메시지에 하나의 이모지) ────────
   const toggleReaction = async (messageId: string, emoji: string) => {
     const msg = messages.find((m) => m.id === messageId);
     const alreadyReacted = !!msg?.reactions[emoji]?.reactedByMe;
+    // 이미 다른 이모지로 반응했다면 그것을 먼저 제거
+    const prevEmoji = Object.entries(msg?.reactions ?? {}).find(([, r]) => r.reactedByMe)?.[0];
 
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== messageId) return m;
-        const existing = m.reactions[emoji];
         const updated = { ...m.reactions };
+        // 기존 이모지 제거
+        if (prevEmoji && prevEmoji !== emoji) {
+          const ex = updated[prevEmoji];
+          if ((ex?.count ?? 0) <= 1) delete updated[prevEmoji];
+          else updated[prevEmoji] = { count: ex!.count - 1, reactedByMe: false };
+        }
+        // 현재 이모지 토글
+        const existing = updated[emoji];
         if (alreadyReacted) {
           if ((existing?.count ?? 0) <= 1) delete updated[emoji];
           else updated[emoji] = { count: existing!.count - 1, reactedByMe: false };
@@ -340,9 +347,13 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       })
     );
     setReactionPickerFor(null);
-    setPickerPos(null);
 
     const supabase = createClient();
+    // 기존 다른 이모지 DB에서 제거
+    if (prevEmoji && prevEmoji !== emoji) {
+      await supabase.from('team_message_reactions').delete()
+        .eq('message_id', messageId).eq('user_id', currentUserId).eq('emoji', prevEmoji);
+    }
     if (alreadyReacted) {
       await supabase.from('team_message_reactions').delete()
         .eq('message_id', messageId).eq('user_id', currentUserId).eq('emoji', emoji);
@@ -352,44 +363,15 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     }
   };
 
-  const openPicker = (e: React.MouseEvent<HTMLButtonElement>, msgId: string) => {
-    if (reactionPickerFor === msgId) {
-      setReactionPickerFor(null);
-      setPickerPos(null);
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    setPickerPos({ top: rect.top - 48, left: rect.left - 100 });
-    setReactionPickerFor(msgId);
+  const togglePicker = (msgId: string) => {
+    setReactionPickerFor((prev) => prev === msgId ? null : msgId);
   };
-
-  // ── 공통 액션 버튼 ──────────────────────────────────────────
-  const EmojiBtn = ({ msgId, e }: { msgId: string; e: React.MouseEvent<HTMLButtonElement> | null }) => null;
-  void EmojiBtn;
 
   // ── 렌더 ────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full bg-white">
 
-      {/* 이모지 피커 — fixed */}
-      {reactionPickerFor && pickerPos && (
-        <div
-          ref={pickerRef}
-          className="fixed flex gap-1.5 rounded-2xl bg-white border border-[#E2E8F4] shadow-lg px-3 py-2 z-50"
-          style={{ top: pickerPos.top, left: pickerPos.left }}
-        >
-          {EMOJIS.map((e) => (
-            <button
-              key={e}
-              onMouseDown={(ev) => { ev.preventDefault(); toggleReaction(reactionPickerFor, e); }}
-              className="text-xl hover:scale-125 transition-transform leading-none"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* 메시지 목록 */}
       <div
@@ -419,7 +401,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                 onMouseLeave={() => setHoveredId(null)}
               >
                 <div className="flex justify-end items-end gap-1 pr-1">
-                  {/* 시간 / 액션 버튼 — 같은 위치, 호버 시 버튼이 시간을 덮음 */}
+                  {/* 시간 / 액션 버튼 영역 */}
                   <div className="flex items-center gap-1 self-end mb-1">
                     {isHovered ? (
                       <>
@@ -432,11 +414,28 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 5v7H4M8 8l-4 4 4 4" />
                           </svg>
                         </button>
-                        <button
-                          onClick={(e) => openPicker(e, msg.id)}
-                          title="반응 추가"
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
-                        >🙂</button>
+                        {/* 감정 버튼 — 버블 바로 왼쪽 위에 피커 */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePicker(msg.id); }}
+                            title="반응 추가"
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
+                          >🙂</button>
+                          {reactionPickerFor === msg.id && (
+                            <div
+                              ref={pickerRef}
+                              className="absolute bottom-full right-0 mb-1.5 flex gap-1.5 rounded-2xl bg-white border border-[#E2E8F4] shadow-lg px-3 py-2 z-50"
+                            >
+                              {EMOJIS.map((e) => (
+                                <button
+                                  key={e}
+                                  onMouseDown={(ev) => { ev.preventDefault(); toggleReaction(msg.id, e); }}
+                                  className="text-xl hover:scale-125 transition-transform leading-none"
+                                >{e}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </>
                     ) : isLast ? (
                       <span className="text-xs text-[#9AAAC0]">{msg.timestamp}</span>
@@ -529,15 +528,32 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                         </div>
                       )}
                     </div>
-                    {/* 시간 / 액션 버튼 — 같은 위치, 호버 시 버튼이 시간을 덮음 */}
+                    {/* 시간 / 액션 버튼 영역 */}
                     <div className="flex items-center gap-1 self-end mb-1">
                       {isHovered ? (
                         <>
-                          <button
-                            onClick={(e) => openPicker(e, msg.id)}
-                            title="반응 추가"
-                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
-                          >🙂</button>
+                          {/* 감정 버튼 — 버블 바로 오른쪽 위에 피커 */}
+                          <div className="relative">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePicker(msg.id); }}
+                              title="반응 추가"
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
+                            >🙂</button>
+                            {reactionPickerFor === msg.id && (
+                              <div
+                                ref={pickerRef}
+                                className="absolute bottom-full left-0 mb-1.5 flex gap-1.5 rounded-2xl bg-white border border-[#E2E8F4] shadow-lg px-3 py-2 z-50"
+                              >
+                                {EMOJIS.map((e) => (
+                                  <button
+                                    key={e}
+                                    onMouseDown={(ev) => { ev.preventDefault(); toggleReaction(msg.id, e); }}
+                                    className="text-xl hover:scale-125 transition-transform leading-none"
+                                  >{e}</button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
                             title="답장"

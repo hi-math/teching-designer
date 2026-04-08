@@ -27,7 +27,7 @@ export function AppShellHeader({ children, className = "", style }: AppShellHead
 export function AppShellBrandIcon() {
   return (
     <img
-      src="/documents.png"
+      src="/logo.svg"
       alt="logo"
       className="h-9 w-9 shrink-0 object-contain"
     />

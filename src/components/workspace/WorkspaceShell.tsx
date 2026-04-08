@@ -352,9 +352,15 @@ function LessonInfoModal({
   title,
   targetGrade,
   relatedSubjects,
+  numClasses,
+  numStudents,
+  totalSessions,
   onTitleChange,
   onTargetGradeChange,
   onRelatedSubjectsChange,
+  onNumClassesChange,
+  onNumStudentsChange,
+  onTotalSessionsChange,
   onClose,
   readOnly = false,
 }: {
@@ -362,15 +368,24 @@ function LessonInfoModal({
   title: string;
   targetGrade: string;
   relatedSubjects: string;
+  numClasses: number | null;
+  numStudents: number | null;
+  totalSessions: number | null;
   onTitleChange: (v: string) => void;
   onTargetGradeChange: (v: string) => void;
   onRelatedSubjectsChange: (v: string) => void;
+  onNumClassesChange: (v: number | null) => void;
+  onNumStudentsChange: (v: number | null) => void;
+  onTotalSessionsChange: (v: number | null) => void;
   onClose: () => void;
   readOnly?: boolean;
 }) {
   const [localTitle, setLocalTitle] = useState(title);
   const [selectedGrades, setSelectedGrades] = useState<string[]>(() => toArr(targetGrade));
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => toArr(relatedSubjects));
+  const [localNumClasses, setLocalNumClasses] = useState<string>(numClasses != null ? String(numClasses) : "");
+  const [localNumStudents, setLocalNumStudents] = useState<string>(numStudents != null ? String(numStudents) : "");
+  const [localTotalSessions, setLocalTotalSessions] = useState<string>(totalSessions != null ? String(totalSessions) : "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -383,14 +398,23 @@ function LessonInfoModal({
     setSaving(true);
     const g = toStr(selectedGrades);
     const s = toStr(selectedSubjects);
+    const nc = localNumClasses !== "" ? parseInt(localNumClasses, 10) : null;
+    const ns = localNumStudents !== "" ? parseInt(localNumStudents, 10) : null;
+    const ts = localTotalSessions !== "" ? parseInt(localTotalSessions, 10) : null;
     await createClient().from("lessons").update({
       title: localTitle || "새 수업설계",
       target_grade: g || null,
       related_subjects: s || null,
+      num_classes: nc,
+      num_students: ns,
+      total_sessions: ts,
     }).eq("id", lessonId);
     onTitleChange(localTitle);
     onTargetGradeChange(g);
     onRelatedSubjectsChange(s);
+    onNumClassesChange(nc);
+    onNumStudentsChange(ns);
+    onTotalSessionsChange(ts);
     setSaving(false);
     onClose();
   };
@@ -479,6 +503,31 @@ function LessonInfoModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 학급수 / 학생수 / 총 차시 */}
+          <div className="flex gap-4">
+            {[
+              { label: "학급수", unit: "학급", value: localNumClasses, setter: setLocalNumClasses },
+              { label: "학생수", unit: "명", value: localNumStudents, setter: setLocalNumStudents },
+              { label: "총 차시", unit: "차시", value: localTotalSessions, setter: setLocalTotalSessions },
+            ].map(({ label, unit, value, setter }) => (
+              <div key={label} className="flex-1">
+                <label className="mb-2 block text-[14px] font-semibold text-[#5a6066]">{label}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={value}
+                    onChange={(e) => !readOnly && setter(e.target.value)}
+                    readOnly={readOnly}
+                    placeholder="—"
+                    className={`w-full rounded-xl bg-[#f1f4f9] px-4 py-3 text-[16px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
+                  />
+                  <span className="shrink-0 text-[14px] text-[#757b82]">{unit}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
         </div>
@@ -571,10 +620,10 @@ function PermissionsModal({
   const toggle = (key: keyof Permissions) => onChange({ ...permissions, [key]: !permissions[key] });
 
   const items: { key: keyof Permissions; label: string; desc: string }[] = [
-    { key: "phaseNav", label: "단계 이동", desc: "ON: 참여자가 상위 탭으로 단계를 자유롭게 이동할 수 있습니다. OFF: 소유자의 단계를 따라갑니다." },
-    { key: "complete", label: "완료", desc: "ON: 참여자가 카드의 완료 버튼을 사용할 수 있습니다." },
-    { key: "skip", label: "건너뛰기", desc: "ON: 참여자가 카드의 건너뛰기 버튼을 사용할 수 있습니다." },
-    { key: "titleEdit", label: "제목 수정", desc: "ON: 모든 사용자가 프로젝트 제목을 수정할 수 있습니다." },
+    { key: "phaseNav", label: "단계 이동", desc: "참여자가 단계를 이동할 수 있습니다." },
+    { key: "complete", label: "완료", desc: "참여자가 완료 버튼을 누를 수 있습니다." },
+    { key: "skip", label: "건너뛰기", desc: "참여자가 건너뛰기 버튼을 누를 수 있습니다." },
+    { key: "titleEdit", label: "제목 수정", desc: "참여자가 프로젝트 제목을 수정할 수 있습니다." },
   ];
 
   return (
@@ -682,6 +731,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [projectTitle, setProjectTitle] = useState("");
   const [targetGrade, setTargetGrade] = useState("");
   const [relatedSubjects, setRelatedSubjects] = useState("");
+  const [numClasses, setNumClasses] = useState<number | null>(null);
+  const [numStudents, setNumStudents] = useState<number | null>(null);
+  const [totalSessions, setTotalSessions] = useState<number | null>(null);
   const [titleSaveStatus, setTitleSaveStatus] = useState<"idle" | "saved">("idle");
   const [titleFocused, setTitleFocused] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -783,6 +835,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         setActivePhase(lessonRes.data.current_phase ?? "T");
         setTargetGrade(lessonRes.data.target_grade ?? "");
         setRelatedSubjects(lessonRes.data.related_subjects ?? "");
+        setNumClasses(lessonRes.data.num_classes ?? null);
+        setNumStudents(lessonRes.data.num_students ?? null);
+        setTotalSessions(lessonRes.data.total_sessions ?? null);
         if (lessonRes.data.permissions) setPermissions(lessonRes.data.permissions as Permissions);
       }
 
@@ -815,6 +870,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           }
           if (c.status === "completed" || c.status === "skipped") {
             statusMap[code] = c.status;
+          }
+          if (code === "__selected_standards" && Array.isArray(c.items)) {
+            setSelectedStandards(c.items);
+            continue;
+          }
+          if (code === "__selected_ideas" && Array.isArray(c.items)) {
+            setSelectedIdeas(c.items);
+            continue;
           }
           if (c.type === "text" && c.text !== undefined) {
             inputs[code] = c.text;
@@ -1336,9 +1399,15 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           title={projectTitle}
           targetGrade={targetGrade}
           relatedSubjects={relatedSubjects}
+          numClasses={numClasses}
+          numStudents={numStudents}
+          totalSessions={totalSessions}
           onTitleChange={setProjectTitle}
           onTargetGradeChange={setTargetGrade}
           onRelatedSubjectsChange={setRelatedSubjects}
+          onNumClassesChange={setNumClasses}
+          onNumStudentsChange={setNumStudents}
+          onTotalSessionsChange={setTotalSessions}
           onClose={() => setActiveModal(null)}
           readOnly={!isHost}
         />
@@ -1374,14 +1443,26 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         <StandardsModal
           onClose={() => setActiveModal(null)}
           selectedStandards={selectedStandards}
-          onSelectionChange={setSelectedStandards}
+          onSelectionChange={(items) => {
+            setSelectedStandards(items);
+            createClient().from("activity_contents").upsert(
+              { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items } },
+              { onConflict: "lesson_id,activity_code" }
+            );
+          }}
           readOnly={!isHost}
         />
       ) : activeModal === "핵심아이디어" ? (
         <IdeasModal
           onClose={() => setActiveModal(null)}
           selectedIdeas={selectedIdeas}
-          onSelectionChange={setSelectedIdeas}
+          onSelectionChange={(items) => {
+            setSelectedIdeas(items);
+            createClient().from("activity_contents").upsert(
+              { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items } },
+              { onConflict: "lesson_id,activity_code" }
+            );
+          }}
           readOnly={!isHost}
         />
       ) : activeModal === "참고자료" ? (
@@ -1906,28 +1987,30 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             {act.code}
                           </p>
                           <div className="flex flex-row gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "completed" ? "active" : "completed"); }}
-                              disabled={!isHost && !permissions.complete}
-                              className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
-                                st === "completed"
-                                  ? "bg-[#bae0ff] text-[#0369a1]"
-                                  : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
-                              } ${!isHost && !permissions.complete ? "opacity-40 cursor-not-allowed" : ""}`}
-                            >
-                              완료
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "skipped" ? "active" : "skipped"); }}
-                              disabled={!isHost && !permissions.skip}
-                              className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
-                                st === "skipped"
-                                  ? "bg-[#e2e4ea] text-[#5a6066]"
-                                  : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
-                              } ${!isHost && !permissions.skip ? "opacity-40 cursor-not-allowed" : ""}`}
-                            >
-                              건너뛰기
-                            </button>
+                            {(isHost || permissions.complete) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "completed" ? "active" : "completed"); }}
+                                className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
+                                  st === "completed"
+                                    ? "bg-[#bae0ff] text-[#0369a1]"
+                                    : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
+                                }`}
+                              >
+                                완료
+                              </button>
+                            )}
+                            {(isHost || permissions.skip) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "skipped" ? "active" : "skipped"); }}
+                                className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
+                                  st === "skipped"
+                                    ? "bg-[#e2e4ea] text-[#5a6066]"
+                                    : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
+                                }`}
+                              >
+                                건너뛰기
+                              </button>
+                            )}
                             {isHost && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
