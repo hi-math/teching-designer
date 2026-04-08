@@ -1520,6 +1520,21 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 value={projectTitle}
                 onFocus={() => (isHost || permissions.titleEdit) && setTitleFocused(true)}
                 onBlur={() => setTitleFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  if (!isHost && !permissions.titleEdit) return;
+                  if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+                  const val = projectTitle;
+                  if (val.trim() && lessonId) {
+                    createClient().from("lessons").update({ title: val }).eq("id", lessonId)
+                      .then(({ error }) => { if (error) console.error('[title] DB save error:', error.message); });
+                    workspaceChannelRef.current?.send({ type: "broadcast", event: "title_change", payload: { title: val } });
+                  }
+                  setTitleSaveStatus("saved");
+                  setTimeout(() => setTitleSaveStatus("idle"), 1000);
+                  titleInputRef.current?.blur();
+                }}
                 onChange={(e) => {
                   if (!isHost && !permissions.titleEdit) return;
                   const val = e.target.value;

@@ -408,9 +408,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
           const isHighlighted = highlightedId === msg.id;
           const color = avatarColor(msg.userId);
 
-          void isLast;
-
-          /* ── 내 메시지 (오른쪽) ── */
+          /* ── 내 메시지 (오른쪽): [답장][감정][버블] ── */
           if (isMe) {
             return (
               <div
@@ -420,28 +418,30 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                 onMouseEnter={() => setHoveredId(msg.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
-                <div className="flex justify-end items-end gap-1.5 pr-1">
-                  {/* 답장 버튼 — 왼쪽 끝 */}
-                  {isHovered && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
-                      title="답장"
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 shrink-0 self-end mb-1"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                    </button>
-                  )}
-                  <span className="shrink-0 text-xs text-[#9AAAC0] self-end mb-1">{msg.timestamp}</span>
-                  {/* 이모지 버튼 — 버블 바로 왼쪽 */}
-                  {isHovered && (
-                    <button
-                      onClick={(e) => openPicker(e, msg.id)}
-                      title="반응 추가"
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50 shrink-0 self-end mb-1"
-                    >🙂</button>
-                  )}
+                <div className="flex justify-end items-end gap-1 pr-1">
+                  {/* 시간 / 액션 버튼 — 같은 위치, 호버 시 버튼이 시간을 덮음 */}
+                  <div className="flex items-center gap-1 self-end mb-1">
+                    {isHovered ? (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
+                          title="답장"
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 5v7H4M8 8l-4 4 4 4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => openPicker(e, msg.id)}
+                          title="반응 추가"
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
+                        >🙂</button>
+                      </>
+                    ) : isLast ? (
+                      <span className="text-xs text-[#9AAAC0]">{msg.timestamp}</span>
+                    ) : null}
+                  </div>
                   <div className="max-w-[70%]">
                     {msg.replyTo && (
                       <button
@@ -474,7 +474,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
             );
           }
 
-          /* ── 팀원 메시지 (왼쪽) ── */
+          /* ── 팀원 메시지 (왼쪽): [버블][감정][답장] ── */
           return (
             <div
               id={`msg-${msg.id}`}
@@ -501,7 +501,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                   {isFirst && (
                     <p className="mb-1.5 text-[14px] font-semibold text-[#3A4560]">{msg.senderName}</p>
                   )}
-                  <div className="flex items-end gap-1.5">
+                  <div className="flex items-end gap-1">
                     <div className="max-w-[70%]">
                       {msg.replyTo && (
                         <button
@@ -529,27 +529,29 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
                         </div>
                       )}
                     </div>
-                    {/* 이모지 버튼 — 버블 바로 오른쪽 */}
-                    {isHovered && (
-                      <button
-                        onClick={(e) => openPicker(e, msg.id)}
-                        title="반응 추가"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50 shrink-0 self-end mb-1"
-                      >🙂</button>
-                    )}
-                    <span className="shrink-0 text-xs text-[#B0BEDA] self-end mb-1">{msg.timestamp}</span>
-                    {/* 답장 버튼 — 오른쪽 끝 */}
-                    {isHovered && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
-                        title="답장"
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600 shrink-0 self-end mb-1"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                      </button>
-                    )}
+                    {/* 시간 / 액션 버튼 — 같은 위치, 호버 시 버튼이 시간을 덮음 */}
+                    <div className="flex items-center gap-1 self-end mb-1">
+                      {isHovered ? (
+                        <>
+                          <button
+                            onClick={(e) => openPicker(e, msg.id)}
+                            title="반응 추가"
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] text-[14px] shadow-sm hover:bg-gray-50"
+                          >🙂</button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setReplyTo(msg); textareaRef.current?.focus(); }}
+                            title="답장"
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#E2E8F4] shadow-sm text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 5v7H4M8 8l-4 4 4 4" />
+                            </svg>
+                          </button>
+                        </>
+                      ) : isLast ? (
+                        <span className="text-xs text-[#B0BEDA]">{msg.timestamp}</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>

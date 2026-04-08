@@ -9,10 +9,14 @@
       "Bash(npx next:*)",
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\PC\\\\Documents\\\\asone-projects\\\\minerva && npx tsc --noEmit 2>&1\")",
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\PC\\\\Documents\\\\asone-projects\\\\minerva && npx supabase db push 2>&1\")",
-      "Read(//c/Users/PC/AppData/Local/Temp/**)"
+      "Read(//c/Users/PC/AppData/Local/Temp/**)",
+      "Read(//c/Users/PC/Documents/asone-projects/**)",
+      "Bash(npm ls:*)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\PC\\Documents\\asone-projects\\minerva\\src\\app\\api\\lessons"
+      "c:\\Users\\PC\\Documents\\asone-projects\\minerva\\src\\app\\api\\lessons",
+      "c:\\Users\\PC\\Documents\\asone-projects\\vercel-pdf-mvp\\src\\app\\api",
+      "c:\\Users\\PC\\Documents\\asone-projects\\vercel-pdf-mvp"
     ]
   }
 }
