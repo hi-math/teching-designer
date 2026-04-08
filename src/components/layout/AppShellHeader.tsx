@@ -14,12 +14,18 @@ type AppShellHeaderProps = {
 
 export function AppShellHeader({ children, className = "", style }: AppShellHeaderProps) {
   return (
-    <header
-      style={style}
-      className={`${appShellHeaderClassName} ${className}`.trim()}
-    >
-      {children}
-    </header>
+    <>
+      <header
+        style={style}
+        className={`${appShellHeaderClassName} ${className}`.trim()}
+      >
+        {children}
+      </header>
+      <div
+        className="h-[2px] w-full shrink-0"
+        style={{ background: "linear-gradient(to right, #5044e3, #44c4b8)" }}
+      />
+    </>
   );
 }
 

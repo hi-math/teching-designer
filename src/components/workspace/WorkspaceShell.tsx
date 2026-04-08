@@ -134,11 +134,11 @@ function VersionModal({
 }: {
   snapshots: Snapshot[];
   lessonId: string;
-  onRestore: (contents: Record<string, { type: string; text?: string; status?: string }>) => Promise<void>;
+  onRestore: (contents: Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }>) => Promise<void>;
   onClose: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string }> | null>(null);
+  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }> | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [confirmSnap, setConfirmSnap] = useState<Snapshot | null>(null);
 
@@ -157,7 +157,7 @@ function VersionModal({
       .select("contents")
       .eq("id", snap.id)
       .single();
-    if (data) setDetail(data.contents as Record<string, { type: string; text?: string; status?: string }>);
+    if (data) setDetail(data.contents as Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }>);
   };
 
   const handleRestore = async (snap: Snapshot) => {
@@ -167,7 +167,7 @@ function VersionModal({
       .select("contents")
       .eq("id", snap.id)
       .single();
-    if (data) await onRestore(data.contents as Record<string, { type: string; text?: string; status?: string }>);
+    if (data) await onRestore(data.contents as Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }>);
     setRestoring(false);
   };
 
@@ -803,6 +803,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const nextVersionRef = useRef(1);
   const lastSnapshotTimeRef = useRef(0);
   const activityInputsRef = useRef<Record<string, string>>({});
+  const selectedStandardsRef = useRef<StandardItem[]>([]);
+  const selectedIdeasRef = useRef<IdeaItem[]>([]);
   const userProfileRef = useRef<UserProfile | null>(null);
 
   // ── 유저 프로필 로드 ─────────────────────────────────────────
@@ -874,10 +876,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           }
           if (code === "__selected_standards" && Array.isArray(c.items)) {
             setSelectedStandards(c.items);
+            selectedStandardsRef.current = c.items;
             continue;
           }
           if (code === "__selected_ideas" && Array.isArray(c.items)) {
             setSelectedIdeas(c.items);
+            selectedIdeasRef.current = c.items;
             continue;
           }
           if (c.type === "text" && c.text !== undefined) {
@@ -1174,7 +1178,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       const status = activityStatusRef.current[code] ?? "active";
       contents[code] = { type: "text", text, status };
     }
-
+    if (selectedStandardsRef.current.length > 0) {
+      contents["__selected_standards"] = { type: "standards", items: selectedStandardsRef.current };
+    }
+    if (selectedIdeasRef.current.length > 0) {
+      contents["__selected_ideas"] = { type: "ideas", items: selectedIdeasRef.current };
+    }
 
     const supabase = createClient();
     await supabase.from("lesson_snapshots").insert({
@@ -1431,6 +1440,18 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const inputs: Record<string, string> = {};
             const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
             for (const [code, c] of Object.entries(contents)) {
+              if (code === "__selected_standards" && Array.isArray(c.items)) {
+                const items = c.items as StandardItem[];
+                setSelectedStandards(items);
+                selectedStandardsRef.current = items;
+                continue;
+              }
+              if (code === "__selected_ideas" && Array.isArray(c.items)) {
+                const items = c.items as IdeaItem[];
+                setSelectedIdeas(items);
+                selectedIdeasRef.current = items;
+                continue;
+              }
               if (c.text !== undefined) inputs[code] = c.text;
               if (c.status === "completed" || c.status === "skipped") statusMap[code] = c.status;
             }
@@ -1446,6 +1467,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           selectedStandards={selectedStandards}
           onSelectionChange={(items) => {
             setSelectedStandards(items);
+            selectedStandardsRef.current = items;
             createClient().from("activity_contents").upsert(
               { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items } },
               { onConflict: "lesson_id,activity_code" }
@@ -1459,6 +1481,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           selectedIdeas={selectedIdeas}
           onSelectionChange={(items) => {
             setSelectedIdeas(items);
+            selectedIdeasRef.current = items;
             createClient().from("activity_contents").upsert(
               { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items } },
               { onConflict: "lesson_id,activity_code" }
@@ -1470,7 +1493,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         <ReferenceModal
           lessonId={lessonId}
           onClose={() => setActiveModal(null)}
-          onFilesChange={loadReferenceFiles}
+          onFilesChange={() => { loadReferenceFiles(); createSnapshot("auto"); }}
         />
       ) : activeModal === "권한관리" ? (
         <PermissionsModal

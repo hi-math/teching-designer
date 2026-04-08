@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import chromium from "@sparticuz/chromium-min";
 import { chromium as playwrightChromium } from "playwright-core";
+import { existsSync } from "fs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,18 @@ const supabase = createClient(
 // ─── Chromium 실행 ───────────────────────────────────────────────
 async function launchBrowser() {
   if (process.env.NODE_ENV === "development") {
+    // Windows 시스템 Chrome/Edge 사용
+    const candidates = [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      process.env.CHROME_PATH,
+    ].filter(Boolean) as string[];
+    const found = candidates.find((p) => existsSync(p));
+    if (found) {
+      return playwrightChromium.launch({ executablePath: found, headless: true });
+    }
     return playwrightChromium.launch({ headless: true });
   }
   const executablePath = await chromium.executablePath(process.env.CHROMIUM_PACK_URL!);
