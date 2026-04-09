@@ -1995,19 +1995,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             onMouseEnter={(e) => { if (status !== 'active' && (isHost || permissions.phaseNav)) e.currentTarget.style.backgroundColor = '#e8eaf0'; }}
                             onMouseLeave={(e) => { if (status !== 'active') e.currentTarget.style.backgroundColor = '#f1f4f9'; }}
                           >
-                            <span className="relative shrink-0">
-                              <span
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] font-bold leading-none"
-                                style={{
-                                  backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
-                                  color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
-                                }}
-                              >
-                                {idx + 1}
-                              </span>
-                              {phasesWithPendingOpinions.has(phase.code) && (
-                                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-500 ring-[1.5px] ring-white" />
-                              )}
+                            <span
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] font-bold leading-none"
+                              style={{
+                                backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
+                                color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
+                              }}
+                            >
+                              {idx + 1}
                             </span>
                             <span
                               className="text-[18px] font-semibold leading-tight"
@@ -2017,6 +2012,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               {phase.label}
                             </span>
+                            {phasesWithPendingOpinions.has(phase.code) && (
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: "#44c4b8" }} />
+                            )}
                           </button>
                           {idx < PHASES.length - 1 && (
                             <div className="h-px w-4 shrink-0 bg-[#dde3eb]" />
