@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import MessageBubble, { type Message } from './MessageBubble';
+import { buildChatPayload } from '@/lib/chat/trimPayload';
 
 interface PageContext {
   projectTitle: string;
@@ -61,6 +62,12 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [input]);
 
+  const isInitialLoad = useRef(true);
+
+  // userId를 ref로 유지 — stage 의존성에서 제외해 불필요한 재로드 방지
+  const userIdRef = useRef(userId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
+
   // 단계 전환 시 DB에서 대화 기록 로드
   useEffect(() => {
     if (!lessonId) {
@@ -68,14 +75,19 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       setTimestamps([]);
       return;
     }
+    isInitialLoad.current = true; // stage 바뀔 때마다 즉시 스크롤 리셋
     const load = async () => {
-      const loadUid = authUidRef.current || userId;
-      if (!loadUid) return;
+      // userId가 아직 없으면 auth에서 직접 가져옴
+      const uid = userIdRef.current || authUidRef.current || (await createClient().auth.getUser().then(({ data }) => {
+        if (data.user) { authUidRef.current = data.user.id; userIdRef.current = data.user.id; }
+        return data.user?.id ?? null;
+      }));
+      if (!uid) return;
       const { data } = await createClient()
         .from('ai_messages')
         .select('role, content, created_at')
         .eq('lesson_id', lessonId)
-        .eq('user_id', loadUid)
+        .eq('user_id', uid)
         .eq('context_activity_code', stage)
         .order('created_at', { ascending: true });
       if (!data) return;
@@ -88,9 +100,10 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       }));
     };
     load();
-  }, [stage, lessonId, userId]);
+  // userId는 ref로 처리하므로 의존성에서 제외
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, lessonId]);
 
-  const isInitialLoad = useRef(true);
   useEffect(() => {
     if (isInitialLoad.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'instant' });
@@ -153,7 +166,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, stage, pageContext }),
+        body: JSON.stringify(buildChatPayload({ messages: apiMessages, stage, pageContext })),
         signal: abortRef.current.signal,
       });
 

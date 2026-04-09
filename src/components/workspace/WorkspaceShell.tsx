@@ -134,11 +134,11 @@ function VersionModal({
 }: {
   snapshots: Snapshot[];
   lessonId: string;
-  onRestore: (contents: Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }>) => Promise<void>;
+  onRestore: (contents: Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string }>) => Promise<void>;
   onClose: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[] }> | null>(null);
+  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string }> | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [confirmSnap, setConfirmSnap] = useState<Snapshot | null>(null);
 
@@ -819,6 +819,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const activityInputsRef = useRef<Record<string, string>>({});
   const selectedStandardsRef = useRef<StandardItem[]>([]);
   const selectedIdeasRef = useRef<IdeaItem[]>([]);
+  const opinionsRef = useRef<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
+  const opinionResponsesRef = useRef<Record<string, Record<string, string>>>({});
   const userProfileRef = useRef<UserProfile | null>(null);
 
   // ── 유저 프로필 로드 ─────────────────────────────────────────
@@ -1217,6 +1219,15 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     if (selectedIdeasRef.current.length > 0) {
       contents["__selected_ideas"] = { type: "ideas", items: selectedIdeasRef.current };
     }
+    // 의견묻기 질문 + 응답 포함
+    for (const [opinionKey, o] of Object.entries(opinionsRef.current)) {
+      contents[`${opinionKey}__opinion`] = { type: "opinion", question: o.question, active: !o.hidden };
+    }
+    for (const [opinionKey, resMap] of Object.entries(opinionResponsesRef.current)) {
+      for (const [uid, response] of Object.entries(resMap)) {
+        contents[`${opinionKey}__opinion_res_${uid}`] = { type: "opinion_response", response };
+      }
+    }
 
     const supabase = createClient();
     await supabase.from("lesson_snapshots").insert({
@@ -1351,6 +1362,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   useEffect(() => { projectTitleRef.current = projectTitle; }, [projectTitle]);
   // 버전 생성 클로저용 ref 동기화
   useEffect(() => { activityInputsRef.current = activityInputs; }, [activityInputs]);
+  useEffect(() => { opinionsRef.current = opinions; }, [opinions]);
+  useEffect(() => { opinionResponsesRef.current = opinionResponses; }, [opinionResponses]);
   useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
 
   // 세션 종료 시 미저장 내용 flush + 버전 생성 (keepalive fetch로 보장)
@@ -1475,6 +1488,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             );
             const inputs: Record<string, string> = {};
             const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
+            const restoredOpinions: Record<string, { question: string; hidden: boolean; actCode: string }> = {};
+            const restoredOpinionResponses: Record<string, Record<string, string>> = {};
             for (const [code, c] of Object.entries(contents)) {
               if (code === "__selected_standards" && Array.isArray(c.items)) {
                 const items = c.items as StandardItem[];
@@ -1488,12 +1503,31 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 selectedIdeasRef.current = items;
                 continue;
               }
+              if (code.endsWith("__opinion")) {
+                if (c.active !== false && c.question) {
+                  const opinionKey = code.slice(0, -"__opinion".length);
+                  const m = opinionKey.match(/^(.+)__(\d+)$/);
+                  const actCodeFromKey = m ? m[1] : opinionKey;
+                  restoredOpinions[opinionKey] = { question: c.question as string, hidden: false, actCode: actCodeFromKey };
+                }
+                continue;
+              }
+              const resIdx = code.indexOf("__opinion_res_");
+              if (resIdx !== -1) {
+                const opinionKey = code.slice(0, resIdx);
+                const uid = code.slice(resIdx + "__opinion_res_".length);
+                if (!restoredOpinionResponses[opinionKey]) restoredOpinionResponses[opinionKey] = {};
+                restoredOpinionResponses[opinionKey][uid] = (c.response as string) ?? "";
+                continue;
+              }
               if (c.text !== undefined) inputs[code] = c.text;
               if (c.status === "completed" || c.status === "skipped") statusMap[code] = c.status;
             }
             setActivityInputs(inputs);
             setActivityStatus(statusMap);
             activityStatusRef.current = statusMap;
+            if (Object.keys(restoredOpinions).length > 0) { setOpinions(restoredOpinions); opinionsRef.current = restoredOpinions; }
+            if (Object.keys(restoredOpinionResponses).length > 0) { setOpinionResponses(restoredOpinionResponses); opinionResponsesRef.current = restoredOpinionResponses; }
             setActiveModal(null);
           }}
         />
@@ -1505,9 +1539,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             setSelectedStandards(items);
             selectedStandardsRef.current = items;
             createClient().from("activity_contents").upsert(
-              { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items } },
+              { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items }, updated_by: userProfile?.id ?? null },
               { onConflict: "lesson_id,activity_code" }
-            );
+            ).then(({ error }) => { if (error) console.error("[standards save]", error); });
           }}
           readOnly={!isHost}
         />
@@ -1519,9 +1553,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             setSelectedIdeas(items);
             selectedIdeasRef.current = items;
             createClient().from("activity_contents").upsert(
-              { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items } },
+              { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items }, updated_by: userProfile?.id ?? null },
               { onConflict: "lesson_id,activity_code" }
-            );
+            ).then(({ error }) => { if (error) console.error("[ideas save]", error); });
           }}
           readOnly={!isHost}
         />
@@ -2405,9 +2439,10 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       </div>
 
       {/* ── 푸터 ── */}
-      <div className="shrink-0 h-8 bg-[#f1f4f9] flex items-center px-4">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-[#adb2ba]">Minerva</p>
-      </div>
+      <footer className="flex shrink-0 items-center justify-between border-t border-gray-100 bg-white px-8 py-3 text-[12px]" style={{ color: "#9ca3af" }}>
+        <span className="font-semibold" style={{ color: "#5044e3" }}>Minerva</span>
+        <span>2026 서울특별시교육청</span>
+      </footer>
 
     </div>
     </div>
