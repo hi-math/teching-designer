@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ProfilePanel, { type UserProfile } from "@/components/dashboard/ProfilePanel";
@@ -1167,6 +1167,25 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
   useEffect(() => { loadReferenceFiles(); }, [loadReferenceFiles]);
 
+  // ── 미응답 의견묻기가 있는 단계 집합 ────────────────────────
+  const phasesWithPendingOpinions = useMemo(() => {
+    const myId = userProfile?.id ?? "";
+    const pending = new Set<string>();
+    for (const [opinionKey, opinion] of Object.entries(opinions)) {
+      if (opinion.hidden) continue;
+      if (opinionResponses[opinionKey]?.[myId]) continue; // 이미 응답함
+      // actCode가 속한 phase 찾기
+      for (const [phaseCode, sections] of Object.entries(PHASE_SECTIONS)) {
+        for (const sec of sections) {
+          if (sec.activities.some((a) => a.code === opinion.actCode)) {
+            pending.add(phaseCode);
+          }
+        }
+      }
+    }
+    return pending;
+  }, [opinions, opinionResponses, userProfile]);
+
   // ── 스냅샷 생성 (최대 10개 유지) ────────────────────────────
   const createSnapshot = useCallback(async (trigger: "auto" | "session_end") => {
     lastSnapshotTimeRef.current = Date.now();
@@ -1602,11 +1621,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       <AppShellHeader style={getAppShellHeaderSurface()}>
         {/* 좌: 로고 자리 + 사이드바 너비만큼 띄운 후 프로젝트 제목 */}
         <div className="flex min-w-0 flex-1 items-center">
-          {/* 브랜드 — 사이드바와 동일 너비로 타이틀을 콘텐츠 왼쪽에 정렬 */}
+          {/* 브랜드 — 항상 표시, 사이드바 너비만큼 공간 확보 */}
           <div className={`shrink-0 flex items-center ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`}>
-            {!sidebarCollapsed && (
-              <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">T-CID Assistant</span>
-            )}
+            <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
           </div>
           {/* 저장 표식 + 타이틀 */}
           <div className="flex items-center gap-3">
@@ -1971,7 +1988,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                               if (!isHost && !permissions.phaseNav) return;
                               handlePhaseChange(phase.code);
                             }}
-                            className={`flex w-40 items-center gap-2.5 rounded-full pl-2 pr-4 py-2 transition-all ${!isHost && !permissions.phaseNav ? "cursor-default" : ""}`}
+                            className={`relative flex w-40 items-center gap-2.5 rounded-full pl-2 pr-4 py-2 transition-all ${!isHost && !permissions.phaseNav ? "cursor-default" : ""}`}
                             style={{
                               backgroundColor: status === 'active' ? '#5044e3' : '#f1f4f9',
                             }}
@@ -1995,6 +2012,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               {phase.label}
                             </span>
+                            {phasesWithPendingOpinions.has(phase.code) && (
+                              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
+                            )}
                           </button>
                           {idx < PHASES.length - 1 && (
                             <div className="h-px w-4 shrink-0 bg-[#dde3eb]" />

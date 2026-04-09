@@ -22,7 +22,7 @@ export default function DashboardShell({ profile }: { profile: UserProfile }) {
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <AppShellHeader style={getAppShellHeaderSurface()}>
         <div className="flex min-w-0 items-center px-1">
-          <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">T-CID Assistant</span>
+          <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
         </div>
         <div className="w-8 shrink-0" aria-hidden />
       </AppShellHeader>

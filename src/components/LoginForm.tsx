@@ -58,10 +58,7 @@ export default function LoginForm() {
 
       {/* ── 상단 내비게이션 ── */}
       <nav className="flex items-center justify-between px-8 py-4">
-        <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="Minerva" className="h-8 w-8 object-contain" />
-          <span className="text-[15px] font-bold" style={{ color: "#5044e3" }}>Minerva</span>
-        </div>
+        <span className="text-[15px] font-bold" style={{ color: "#5044e3" }}>Minerva</span>
       </nav>
 
       {/* ── 메인 카드 ── */}
@@ -257,11 +254,7 @@ export default function LoginForm() {
       {/* ── 푸터 ── */}
       <footer className="flex items-center justify-between px-8 py-4 text-[12px]" style={{ color: "#9ca3af" }}>
         <span style={{ color: "#5044e3", fontWeight: 600 }}>Minerva</span>
-        <span>© 2025 Minerva. All rights reserved.</span>
-        <div className="flex gap-4">
-          <a href="#" className="transition hover:opacity-70">개인정보처리방침</a>
-          <a href="#" className="transition hover:opacity-70">이용약관</a>
-        </div>
+        <span>2026 서울특별시교육청</span>
       </footer>
     </div>
   );
