@@ -22,7 +22,7 @@ export default function DashboardShell({ profile }: { profile: UserProfile }) {
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <AppShellHeader style={getAppShellHeaderSurface()}>
         <div className="flex min-w-0 items-center px-1">
-          <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
+          <span className="text-[22px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
         </div>
         <div className="w-8 shrink-0" aria-hidden />
       </AppShellHeader>
@@ -41,6 +41,12 @@ export default function DashboardShell({ profile }: { profile: UserProfile }) {
           onNewItemDone={() => setNewItemType(null)}
         />
       </div>
+
+      {/* ── 푸터 ── */}
+      <footer className="flex shrink-0 items-center justify-between border-t border-gray-100 bg-white px-8 py-3 text-[12px]" style={{ color: "#9ca3af" }}>
+        <span className="font-semibold" style={{ color: "#5044e3" }}>Minerva</span>
+        <span>2026 서울특별시교육청</span>
+      </footer>
     </div>
   );
 }

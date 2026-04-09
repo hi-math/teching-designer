@@ -1623,7 +1623,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         <div className="flex min-w-0 flex-1 items-center">
           {/* 브랜드 — 항상 표시, 사이드바 너비만큼 공간 확보 */}
           <div className={`shrink-0 flex items-center ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`}>
-            <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
+            <span className="text-[22px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
           </div>
           {/* 저장 표식 + 타이틀 */}
           <div className="flex items-center gap-3">
@@ -1995,14 +1995,19 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             onMouseEnter={(e) => { if (status !== 'active' && (isHost || permissions.phaseNav)) e.currentTarget.style.backgroundColor = '#e8eaf0'; }}
                             onMouseLeave={(e) => { if (status !== 'active') e.currentTarget.style.backgroundColor = '#f1f4f9'; }}
                           >
-                            <span
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] font-bold leading-none"
-                              style={{
-                                backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
-                                color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
-                              }}
-                            >
-                              {idx + 1}
+                            <span className="relative shrink-0">
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] font-bold leading-none"
+                                style={{
+                                  backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
+                                  color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
+                                }}
+                              >
+                                {idx + 1}
+                              </span>
+                              {phasesWithPendingOpinions.has(phase.code) && (
+                                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-500 ring-[1.5px] ring-white" />
+                              )}
                             </span>
                             <span
                               className="text-[18px] font-semibold leading-tight"
@@ -2012,9 +2017,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               {phase.label}
                             </span>
-                            {phasesWithPendingOpinions.has(phase.code) && (
-                              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
-                            )}
                           </button>
                           {idx < PHASES.length - 1 && (
                             <div className="h-px w-4 shrink-0 bg-[#dde3eb]" />
