@@ -21,9 +21,8 @@ export default function DashboardShell({ profile }: { profile: UserProfile }) {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <AppShellHeader style={getAppShellHeaderSurface()}>
-        <div className="flex min-w-0 items-center gap-2.5 px-1">
-          <img src="/logo.svg" alt="logo" className="h-9 w-9 object-contain" />
-          <span className="text-[16px] font-bold leading-tight text-white">LOGO</span>
+        <div className="flex min-w-0 items-center px-1">
+          <img src="/logo.svg" alt="logo" className="h-10 object-contain" />
         </div>
         <div className="w-8 shrink-0" aria-hidden />
       </AppShellHeader>

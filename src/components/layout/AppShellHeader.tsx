@@ -22,7 +22,7 @@ export function AppShellHeader({ children, className = "", style }: AppShellHead
         {children}
       </header>
       <div
-        className="h-[2px] w-full shrink-0"
+        className="h-[4px] w-full shrink-0"
         style={{ background: "linear-gradient(to right, #5044e3, #44c4b8)" }}
       />
     </>

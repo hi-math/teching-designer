@@ -1602,8 +1602,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       <AppShellHeader style={getAppShellHeaderSurface()}>
         {/* 좌: 로고 자리 + 사이드바 너비만큼 띄운 후 프로젝트 제목 */}
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          {/* 로고 플레이스홀더 — 사이드바 너비와 맞춤 */}
-          <span className="shrink-0 text-[15px] font-black tracking-widest text-white/80 uppercase">로고</span>
+          {/* 로고 */}
+          <img src="/logo.svg" alt="logo" className="shrink-0 h-10 object-contain" />
           <div className={`shrink-0 ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`} />
           {/* 저장 표식 + 타이틀 */}
           <div className="flex items-center gap-3">
