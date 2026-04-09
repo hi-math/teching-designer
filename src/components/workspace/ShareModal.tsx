@@ -9,15 +9,23 @@ type MemberInfo = { id: string; name: string; email: string; avatarUrl: string |
 export default function ShareModal({
   lessonId,
   members = [],
+  isHost = false,
+  onlineUserIds = [],
+  onMemberRemoved,
   onClose,
 }: {
   lessonId: string;
   members?: MemberInfo[];
+  isHost?: boolean;
+  onlineUserIds?: string[];
+  onMemberRemoved?: (userId: string) => void;
   onClose: () => void;
 }) {
   const [email, setEmail] = useState('');
   const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
   const [invitedName, setInvitedName] = useState('');
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [onlineAlert, setOnlineAlert] = useState(false);
 
   const [link, setLink] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -82,6 +90,21 @@ export default function ShareModal({
     setLink(url);
   };
 
+  const removeMember = async (userId: string) => {
+    if (onlineUserIds.includes(userId)) {
+      setOnlineAlert(true);
+      return;
+    }
+    setRemovingId(userId);
+    await fetch(`/api/lessons/${lessonId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    setRemovingId(null);
+    onMemberRemoved?.(userId);
+  };
+
   const copy = async () => {
     await navigator.clipboard.writeText(link);
     setCopied(true);
@@ -126,6 +149,24 @@ export default function ShareModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {/* 온라인 사용자 삭제 시도 경고 */}
+          {onlineAlert && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-[13px] font-medium text-amber-700">현재 사용자를 삭제할 수 없습니다</p>
+                <p className="mt-0.5 text-[12px] text-amber-600">해당 멤버가 현재 접속 중입니다. 세션이 종료된 후 삭제해 주세요.</p>
+              </div>
+              <button onClick={() => setOnlineAlert(false)} className="shrink-0 text-amber-400 hover:text-amber-600">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* 현재 공유 중인 멤버 */}
           {members.length > 0 && (
             <div>
@@ -144,12 +185,31 @@ export default function ShareModal({
                           {m.name.charAt(0)}
                         </div>
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate text-[14px] font-medium text-[#2d3339]">
                           {m.name}{idx === 0 ? <span className="ml-1.5 text-[11px] font-normal text-[#adb2ba]">(소유자)</span> : null}
                         </p>
                         <p className="truncate text-[12px] text-[#757b82]">{m.email}</p>
                       </div>
+                      {isHost && idx !== 0 && (
+                        <button
+                          onClick={() => removeMember(m.id)}
+                          disabled={removingId === m.id}
+                          className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg text-[#adb2ba] transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                          title="멤버 삭제"
+                        >
+                          {removingId === m.id ? (
+                            <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                          ) : (
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
                     </div>
                   );
                 })}

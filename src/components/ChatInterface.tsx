@@ -90,8 +90,14 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     load();
   }, [stage, lessonId, userId]);
 
+  const isInitialLoad = useRef(true);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isInitialLoad.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      isInitialLoad.current = false;
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const sendMessage = async (text: string) => {

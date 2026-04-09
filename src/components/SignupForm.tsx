@@ -107,7 +107,7 @@ export default function SignupForm() {
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 text-2xl font-bold text-gray-900">LOGO</div>
           <h1 className="text-2xl font-bold text-gray-900">회원가입</h1>
-          <p className="mt-1 text-sm text-gray-500">Teching Designer 계정을 만드세요</p>
+          <p className="mt-1 text-sm text-gray-500">Minerva 계정을 만드세요</p>
         </div>
 
         {/* 카드 */}

@@ -15,7 +15,7 @@ const aritaDotum = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Teching Designer",
+  title: "Minerva",
   description: "협력적 수업설계 AI 에이전트",
 };
 

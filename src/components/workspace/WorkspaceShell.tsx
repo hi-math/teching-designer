@@ -329,7 +329,7 @@ function VersionModal({
   );
 }
 
-// ─── 수업정보 모달 ────────────────────────────────────────────────
+// ─── 수업 기본정보 모달 ──────────────────────────────────────────
 
 const GRADE_BUTTONS = ["중학교 1학년", "중학교 2학년", "중학교 3학년"];
 
@@ -345,6 +345,10 @@ function toArr(v: string): string[] {
 }
 function toStr(arr: string[]): string {
   return arr.join(",");
+}
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function LessonInfoModal({
@@ -383,10 +387,16 @@ function LessonInfoModal({
   const [localTitle, setLocalTitle] = useState(title);
   const [selectedGrades, setSelectedGrades] = useState<string[]>(() => toArr(targetGrade));
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(() => toArr(relatedSubjects));
-  const [localNumClasses, setLocalNumClasses] = useState<string>(numClasses != null ? String(numClasses) : "");
-  const [localNumStudents, setLocalNumStudents] = useState<string>(numStudents != null ? String(numStudents) : "");
   const [localTotalSessions, setLocalTotalSessions] = useState<string>(totalSessions != null ? String(totalSessions) : "");
+  const [createdDate, setCreatedDate] = useState<string>(todayStr());
   const [saving, setSaving] = useState(false);
+
+  // DB에서 created_date 로드
+  useEffect(() => {
+    createClient().from("lessons").select("created_date").eq("id", lessonId).single().then(({ data }) => {
+      if (data?.created_date) setCreatedDate(data.created_date);
+    });
+  }, [lessonId]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -398,22 +408,21 @@ function LessonInfoModal({
     setSaving(true);
     const g = toStr(selectedGrades);
     const s = toStr(selectedSubjects);
-    const nc = localNumClasses !== "" ? parseInt(localNumClasses, 10) : null;
-    const ns = localNumStudents !== "" ? parseInt(localNumStudents, 10) : null;
     const ts = localTotalSessions !== "" ? parseInt(localTotalSessions, 10) : null;
     await createClient().from("lessons").update({
       title: localTitle || "새 수업설계",
       target_grade: g || null,
       related_subjects: s || null,
-      num_classes: nc,
-      num_students: ns,
+      num_classes: null,
+      num_students: null,
       total_sessions: ts,
+      created_date: createdDate || null,
     }).eq("id", lessonId);
     onTitleChange(localTitle);
     onTargetGradeChange(g);
     onRelatedSubjectsChange(s);
-    onNumClassesChange(nc);
-    onNumStudentsChange(ns);
+    onNumClassesChange(null);
+    onNumStudentsChange(null);
     onTotalSessionsChange(ts);
     setSaving(false);
     onClose();
@@ -429,15 +438,20 @@ function LessonInfoModal({
       prev.includes(s) ? prev.filter((v) => v !== s) : [...prev, s]
     );
 
+  const fieldCls = `w-full rounded-xl bg-[#f1f4f9] px-4 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`;
+  const labelCls = "mb-1.5 block text-[13px] font-semibold text-[#5a6066]";
+  const rowCls = "flex items-center gap-4";
+  const leftCls = "w-[120px] shrink-0 text-[14px] font-semibold text-[#5a6066]";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-[700px] max-h-[88vh] flex flex-col rounded-2xl border border-gray-200 bg-white shadow-xl">
+      <div className="w-[660px] max-h-[90vh] flex flex-col rounded-2xl border border-gray-200 bg-white shadow-xl">
         {/* 헤더 */}
-        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-8 py-6">
-          <h2 className="text-[24px] font-bold text-gray-900">수업정보</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-8 py-5">
+          <h2 className="text-[20px] font-bold text-gray-900">수업 기본정보</h2>
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
@@ -449,30 +463,30 @@ function LessonInfoModal({
         </div>
 
         {/* 폼 */}
-        <div className="flex-1 overflow-y-auto space-y-8 px-8 py-7">
+        <div className="flex-1 overflow-y-auto space-y-6 px-8 py-7">
 
           {/* 수업 제목 */}
-          <div>
-            <label className="mb-2 block text-[14px] font-semibold text-[#5a6066]">수업 제목</label>
+          <div className={rowCls}>
+            <span className={leftCls}>수업 제목</span>
             <input
               value={localTitle}
               onChange={(e) => !readOnly && setLocalTitle(e.target.value)}
               readOnly={readOnly}
               placeholder="수업 제목을 입력하세요"
-              className={`w-full rounded-xl bg-[#f1f4f9] px-4 py-3 text-[16px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
+              className={fieldCls}
             />
           </div>
 
           {/* 대상 학년 */}
-          <div>
-            <label className="mb-2.5 block text-[14px] font-semibold text-[#5a6066]">대상 학년</label>
-            <div className="flex gap-2.5">
+          <div className={rowCls}>
+            <span className={leftCls}>대상 학년</span>
+            <div className="flex flex-wrap gap-2">
               {GRADE_BUTTONS.map((g) => (
                 <button
                   key={g}
                   onClick={() => !readOnly && toggleGrade(g)}
                   disabled={readOnly}
-                  className={`rounded-full px-6 py-2.5 text-[14px] font-medium transition ${
+                  className={`rounded-full px-5 py-2 text-[13px] font-medium transition ${
                     selectedGrades.includes(g)
                       ? "bg-[#5044e3] text-white"
                       : "bg-[#f1f4f9] text-[#757b82] hover:bg-[#e8eaf4] hover:text-[#5044e3]"
@@ -484,16 +498,16 @@ function LessonInfoModal({
             </div>
           </div>
 
-          {/* 연계 과목 */}
-          <div>
-            <label className="mb-2.5 block text-[14px] font-semibold text-[#5a6066]">연계 과목</label>
+          {/* 교과 */}
+          <div className={rowCls}>
+            <span className={`${leftCls} self-start pt-1`}>교과</span>
             <div className="flex flex-wrap gap-2">
               {SUBJECT_BUTTONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => !readOnly && toggleSubject(s)}
                   disabled={readOnly}
-                  className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+                  className={`rounded-full px-4 py-1.5 text-[13px] font-medium transition ${
                     selectedSubjects.includes(s)
                       ? "bg-[#5044e3] text-white"
                       : "bg-[#f1f4f9] text-[#757b82] hover:bg-[#e8eaf4] hover:text-[#5044e3]"
@@ -505,29 +519,35 @@ function LessonInfoModal({
             </div>
           </div>
 
-          {/* 학급수 / 학생수 / 총 차시 */}
-          <div className="flex gap-4">
-            {[
-              { label: "학급수", unit: "학급", value: localNumClasses, setter: setLocalNumClasses },
-              { label: "학생수", unit: "명", value: localNumStudents, setter: setLocalNumStudents },
-              { label: "총 차시", unit: "차시", value: localTotalSessions, setter: setLocalTotalSessions },
-            ].map(({ label, unit, value, setter }) => (
-              <div key={label} className="flex-1">
-                <label className="mb-2 block text-[14px] font-semibold text-[#5a6066]">{label}</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    value={value}
-                    onChange={(e) => !readOnly && setter(e.target.value)}
-                    readOnly={readOnly}
-                    placeholder="—"
-                    className={`w-full rounded-xl bg-[#f1f4f9] px-4 py-3 text-[16px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
-                  />
-                  <span className="shrink-0 text-[14px] text-[#757b82]">{unit}</span>
-                </div>
-              </div>
-            ))}
+          {/* 총 차시 */}
+          <div className={rowCls}>
+            <span className={leftCls}>총 차시</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={localTotalSessions}
+                onChange={(e) => !readOnly && setLocalTotalSessions(e.target.value)}
+                readOnly={readOnly}
+                placeholder="—"
+                className={`w-32 rounded-xl bg-[#f1f4f9] px-4 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
+              />
+              <span className="text-[14px] text-[#757b82]">차시</span>
+            </div>
+          </div>
+
+          {/* 작성일 */}
+          <div className={rowCls}>
+            <span className={leftCls}>작성일</span>
+            <div className="relative">
+              <input
+                type="date"
+                value={createdDate}
+                onChange={(e) => !readOnly && setCreatedDate(e.target.value)}
+                readOnly={readOnly}
+                className={`rounded-xl bg-[#f1f4f9] px-4 py-3 text-[15px] text-[#2d3339] outline-none focus:ring-2 focus:ring-[#5044e3]/20 ${readOnly ? "cursor-default" : ""}`}
+              />
+            </div>
           </div>
 
         </div>
@@ -535,18 +555,12 @@ function LessonInfoModal({
         {/* 푸터 */}
         <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-gray-100 px-8 py-5">
           {readOnly ? (
-            <button
-              onClick={onClose}
-              className="rounded-xl bg-[#5044e3] px-6 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4035c8]"
-            >
+            <button onClick={onClose} className="rounded-xl bg-[#5044e3] px-6 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4035c8]">
               닫기
             </button>
           ) : (
             <>
-              <button
-                onClick={onClose}
-                className="rounded-xl border border-gray-200 px-6 py-2.5 text-[14px] font-medium text-[#757b82] transition hover:bg-gray-50"
-              >
+              <button onClick={onClose} className="rounded-xl border border-gray-200 px-6 py-2.5 text-[14px] font-medium text-[#757b82] transition hover:bg-gray-50">
                 취소
               </button>
               <button
@@ -1417,12 +1431,15 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             ...(userProfile ? [{ id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나", email: userProfile.email ?? "", avatarUrl: userProfile.avatar_url ?? null }] : []),
             ...lessonMembers.filter((m) => m.id !== userProfile?.id),
           ]}
+          isHost={isHost}
+          onlineUserIds={onlineUserIds}
+          onMemberRemoved={(userId) => setLessonMembers((prev) => prev.filter((m) => m.id !== userId))}
           onClose={() => setShareModalOpen(false)}
         />
       )}
 
       {/* 워크스페이스 모달 */}
-      {activeModal === "수업정보" ? (
+      {activeModal === "수업 기본정보" ? (
         <LessonInfoModal
           lessonId={lessonId}
           title={projectTitle}
@@ -1621,8 +1638,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       <AppShellHeader style={getAppShellHeaderSurface()}>
         {/* 좌: 로고 자리 + 사이드바 너비만큼 띄운 후 프로젝트 제목 */}
         <div className="flex min-w-0 flex-1 items-center">
-          {/* 브랜드 — 항상 표시, 사이드바 너비만큼 공간 확보 */}
-          <div className={`shrink-0 flex items-center ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`}>
+          {/* 브랜드 — 고정 너비, 사이드바 상태와 무관 */}
+          <div className="shrink-0 w-[11%] min-w-[150px] flex items-center">
             <span className="text-[22px] font-bold tracking-tight text-white whitespace-nowrap">Minerva</span>
           </div>
           {/* 저장 표식 + 타이틀 */}
@@ -1827,7 +1844,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             >
               {openAccordion === "기본정보" && !sidebarCollapsed && (
                 <div className="ml-2 mt-0.5 overflow-hidden rounded-xl bg-[#f8f9fd]">
-                  {["수업정보", "성취기준", "핵심아이디어"].map((sub) => (
+                  {["수업 기본정보", "성취기준", "핵심아이디어"].map((sub) => (
                     <button key={sub} onClick={() => setActiveModal(sub)}
                       className="w-full rounded-full px-4 py-2 text-left text-[15px] text-[#757b82] transition hover:text-[#5044e3]">
                       {sub}
@@ -1995,14 +2012,19 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             onMouseEnter={(e) => { if (status !== 'active' && (isHost || permissions.phaseNav)) e.currentTarget.style.backgroundColor = '#e8eaf0'; }}
                             onMouseLeave={(e) => { if (status !== 'active') e.currentTarget.style.backgroundColor = '#f1f4f9'; }}
                           >
-                            <span
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] font-bold leading-none"
-                              style={{
-                                backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
-                                color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
-                              }}
-                            >
-                              {idx + 1}
+                            <span className="relative shrink-0">
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] font-bold leading-none"
+                                style={{
+                                  backgroundColor: status === 'active' ? 'rgba(255,255,255,0.25)' : status === 'done' ? '#adb2ba' : '#dde3eb',
+                                  color: status === 'active' ? '#fff' : status === 'done' ? '#fff' : '#adb2ba',
+                                }}
+                              >
+                                {idx + 1}
+                              </span>
+                              {phasesWithPendingOpinions.has(phase.code) && (
+                                <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full ring-[1.5px] ring-white" style={{ backgroundColor: "#44c4b8" }} />
+                              )}
                             </span>
                             <span
                               className="text-[18px] font-semibold leading-tight"
@@ -2012,9 +2034,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             >
                               {phase.label}
                             </span>
-                            {phasesWithPendingOpinions.has(phase.code) && (
-                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: "#44c4b8" }} />
-                            )}
                           </button>
                           {idx < PHASES.length - 1 && (
                             <div className="h-px w-4 shrink-0 bg-[#dde3eb]" />
@@ -2387,7 +2406,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
       {/* ── 푸터 ── */}
       <div className="shrink-0 h-8 bg-[#f1f4f9] flex items-center px-4">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-[#adb2ba]">Teaching Designer</p>
+        <p className="text-[12px] font-medium uppercase tracking-wider text-[#adb2ba]">Minerva</p>
       </div>
 
     </div>

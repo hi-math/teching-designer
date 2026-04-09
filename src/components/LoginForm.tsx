@@ -56,11 +56,6 @@ export default function LoginForm() {
   return (
     <div className="flex min-h-screen flex-col" style={{ backgroundColor: "#f4f5fb" }}>
 
-      {/* ── 상단 내비게이션 ── */}
-      <nav className="flex items-center justify-between px-8 py-4">
-        <span className="text-[15px] font-bold" style={{ color: "#5044e3" }}>Minerva</span>
-      </nav>
-
       {/* ── 메인 카드 ── */}
       <main className="flex flex-1 items-center justify-center px-6 py-8">
         <div
