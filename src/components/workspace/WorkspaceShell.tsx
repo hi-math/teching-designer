@@ -1601,10 +1601,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       {/* ── 전체 너비 헤더 ── */}
       <AppShellHeader style={getAppShellHeaderSurface()}>
         {/* 좌: 로고 자리 + 사이드바 너비만큼 띄운 후 프로젝트 제목 */}
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          {/* 로고 */}
-          <img src="/logo.svg" alt="logo" className="shrink-0 h-10 object-contain" />
-          <div className={`shrink-0 ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`} />
+        <div className="flex min-w-0 flex-1 items-center">
+          {/* 브랜드 — 사이드바와 동일 너비로 타이틀을 콘텐츠 왼쪽에 정렬 */}
+          <div className={`shrink-0 flex items-center ${sidebarCollapsed ? "w-14" : "w-[11%] min-w-[150px]"}`}>
+            {!sidebarCollapsed && (
+              <span className="text-[18px] font-bold tracking-tight text-white whitespace-nowrap">T-CID Assistant</span>
+            )}
+          </div>
           {/* 저장 표식 + 타이틀 */}
           <div className="flex items-center gap-3">
             <div

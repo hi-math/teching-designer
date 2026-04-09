@@ -62,13 +62,6 @@ export default function LoginForm() {
           <img src="/logo.svg" alt="Minerva" className="h-8 w-8 object-contain" />
           <span className="text-[15px] font-bold" style={{ color: "#5044e3" }}>Minerva</span>
         </div>
-        <a
-          href={inviteToken ? `/signup?invite=${inviteToken}` : "/signup"}
-          className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90"
-          style={{ backgroundColor: "#5044e3" }}
-        >
-          회원가입
-        </a>
       </nav>
 
       {/* ── 메인 카드 ── */}
@@ -100,11 +93,8 @@ export default function LoginForm() {
             {/* 타이틀 */}
             <div className="mb-8">
               <h1 className="text-[26px] font-bold tracking-tight" style={{ color: "#111827" }}>
-                Welcome Back
+                T-CID Assistant
               </h1>
-              <p className="mt-1.5 text-[14px]" style={{ color: "#6b7280" }}>
-                계정에 로그인하세요.
-              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -257,7 +247,7 @@ export default function LoginForm() {
                 className="font-semibold transition hover:opacity-80"
                 style={{ color: "#5044e3" }}
               >
-                무료로 시작하기
+                회원가입
               </a>
             </p>
           </div>
