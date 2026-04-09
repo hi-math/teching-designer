@@ -12,6 +12,8 @@ import ReferenceModal from "@/components/workspace/ReferenceModal";
 import StandardsModal, { type StandardItem } from "@/components/workspace/StandardsModal";
 import IdeasModal, { type IdeaItem } from "@/components/workspace/IdeasModal";
 import ShareModal from "@/components/workspace/ShareModal";
+import CardFieldRenderer from "@/components/workspace/CardFields";
+import { CARD_SCHEMAS, serializeStructuredForAI } from "@/components/workspace/cardSchemas";
 
 // ─── 워크스페이스 UI 토큰 (세이지 테마 고정) ─────────────────────
 
@@ -134,11 +136,11 @@ function VersionModal({
 }: {
   snapshots: Snapshot[];
   lessonId: string;
-  onRestore: (contents: Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string }>) => Promise<void>;
+  onRestore: (contents: Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string; fields?: Record<string, unknown> }>) => Promise<void>;
   onClose: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string }> | null>(null);
+  const [detail, setDetail] = useState<Record<string, { type: string; text?: string; status?: string; rows?: unknown[]; items?: unknown[]; question?: string; active?: boolean; response?: string; fields?: Record<string, unknown> }> | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [confirmSnap, setConfirmSnap] = useState<Snapshot | null>(null);
 
@@ -757,6 +759,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"team" | "ai">("team");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [structuredInputs, setStructuredInputs] = useState<Record<string, Record<string, unknown>>>({});
   const [aiReady, setAiReady] = useState(false);
   const [activityInputs, setActivityInputs] = useState<Record<string, string>>({});
   const [activityStatus, setActivityStatus] = useState<Record<string, "active" | "completed" | "skipped">>({});
@@ -821,6 +825,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const selectedIdeasRef = useRef<IdeaItem[]>([]);
   const opinionsRef = useRef<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
   const opinionResponsesRef = useRef<Record<string, Record<string, string>>>({});
+  const structuredInputsRef = useRef<Record<string, Record<string, unknown>>>({});
   const userProfileRef = useRef<UserProfile | null>(null);
 
   // ── 유저 프로필 로드 ─────────────────────────────────────────
@@ -865,6 +870,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
         const loadedOpinions: Record<string, { question: string; hidden: boolean; actCode: string }> = {};
         const loadedOpinionResponses: Record<string, Record<string, string>> = {};
+        const loadedStructured: Record<string, Record<string, unknown>> = {};
         for (const row of contentsRes.data) {
           const code = row.activity_code as string;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -872,7 +878,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           if (code.endsWith("__opinion")) {
             if (c?.active !== false && c?.question) {
               const opinionKey = code.slice(0, -"__opinion".length);
-              // new format: actCode__timestamp, old format: actCode (no timestamp)
               const m = opinionKey.match(/^(.+)__(\d+)$/);
               const actCodeFromKey = m ? m[1] : opinionKey;
               loadedOpinions[opinionKey] = { question: c.question, hidden: false, actCode: actCodeFromKey };
@@ -900,10 +905,17 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             selectedIdeasRef.current = c.items;
             continue;
           }
-          if (c.type === "text" && c.text !== undefined) {
-            inputs[code] = c.text;
+          if (c.type === "structured" && c.fields) {
+            loadedStructured[code] = c.fields as Record<string, unknown>;
           } else if (c.type === "role_table" && code === "T-2-1" && c.rows) {
-            setRoleRows(c.rows);
+            // 레거시 T-2-1 → structured 포맷으로 마이그레이션
+            loadedStructured["T-2-1"] = {
+              roles: (c.rows as { name: string; role: string }[]).map(r => ({
+                name: r.name ?? "", subject: "", core_role: r.role ?? "", area: "",
+              })),
+            };
+          } else if (c.type === "text" && c.text !== undefined) {
+            inputs[code] = c.text;
           }
         }
         setActivityInputs(inputs);
@@ -911,6 +923,10 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         activityStatusRef.current = statusMap;
         if (Object.keys(loadedOpinions).length > 0) setOpinions(loadedOpinions);
         if (Object.keys(loadedOpinionResponses).length > 0) setOpinionResponses(loadedOpinionResponses);
+        if (Object.keys(loadedStructured).length > 0) {
+          setStructuredInputs(loadedStructured);
+          structuredInputsRef.current = loadedStructured;
+        }
       }
 
       // 최근 접근 시간 갱신
@@ -978,8 +994,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             [opinionKey]: { ...(prev[opinionKey] ?? {}), [userId]: response },
           }));
         })
-        .subscribe();
-      opinionChannelRef.current = opinionChannel;
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") opinionChannelRef.current = opinionChannel;
+        });
 
       // Workspace Broadcast: permissions + phase_change + title_change
       workspaceChannel = supabaseRt
@@ -1058,11 +1075,37 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           if (!amOwner) setOwnerOffline(!ids.includes(ownerId ?? ""));
         })
         .on("presence", { event: "join" }, ({ newPresences }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const joinedIds = (newPresences as any[]).map((p) => p.userId as string).filter(Boolean);
           setOnlineUserIds((prev) => {
             const next = [...prev];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (newPresences as any[]).forEach((p) => { if (p.userId && !next.includes(p.userId)) next.push(p.userId); });
+            joinedIds.forEach((id) => { if (!next.includes(id)) next.push(id); });
             return next;
+          });
+          // lessonMembers에 없는 userId → 프로필 즉시 fetch
+          setLessonMembers((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const missing = joinedIds.filter((id) => !existingIds.has(id) && id !== me?.id);
+            if (missing.length === 0) return prev;
+            supabaseRt.from("profiles")
+              .select("id, display_name, email, avatar_url")
+              .in("id", missing)
+              .then(({ data }) => {
+                if (!data) return;
+                setLessonMembers((cur) => {
+                  const curIds = new Set(cur.map((m) => m.id));
+                  const toAdd = data
+                    .filter((p: { id: string }) => !curIds.has(p.id))
+                    .map((p: { id: string; display_name: string | null; email: string | null; avatar_url: string | null }) => ({
+                      id: p.id,
+                      name: p.display_name ?? p.email ?? "알 수 없음",
+                      email: p.email ?? "",
+                      avatarUrl: p.avatar_url ?? null,
+                    }));
+                  return toAdd.length > 0 ? [...cur, ...toAdd] : cur;
+                });
+              });
+            return prev; // 비동기 fetch 완료 후 위에서 다시 setState
           });
         })
         .on("presence", { event: "leave" }, ({ leftPresences }) => {
@@ -1189,8 +1232,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     const pending = new Set<string>();
     for (const [opinionKey, opinion] of Object.entries(opinions)) {
       if (opinion.hidden) continue;
-      if (opinionResponses[opinionKey]?.[myId]) continue; // 이미 응답함
-      // actCode가 속한 phase 찾기
+      if (opinionResponses[opinionKey]?.[myId]) continue;
       for (const [phaseCode, sections] of Object.entries(PHASE_SECTIONS)) {
         for (const sec of sections) {
           if (sec.activities.some((a) => a.code === opinion.actCode)) {
@@ -1200,6 +1242,26 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       }
     }
     return pending;
+  }, [opinions, opinionResponses, userProfile]);
+
+  // ── 미응답 의견묻기 목록 (알림 패널용) ──────────────────────
+  const pendingOpinionsList = useMemo(() => {
+    const myId = userProfile?.id ?? "";
+    const list: { opinionKey: string; actCode: string; question: string; phaseCode: string }[] = [];
+    for (const [opinionKey, opinion] of Object.entries(opinions)) {
+      if (opinion.hidden) continue;
+      if (opinionResponses[opinionKey]?.[myId]) continue;
+      let phaseCode = "";
+      outer: for (const [pc, sections] of Object.entries(PHASE_SECTIONS)) {
+        for (const sec of sections) {
+          if (sec.activities.some((a) => a.code === opinion.actCode)) {
+            phaseCode = pc; break outer;
+          }
+        }
+      }
+      list.push({ opinionKey, actCode: opinion.actCode, question: opinion.question, phaseCode });
+    }
+    return list;
   }, [opinions, opinionResponses, userProfile]);
 
   // ── 스냅샷 생성 (최대 10개 유지) ────────────────────────────
@@ -1212,6 +1274,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     for (const [code, text] of Object.entries(activityInputsRef.current)) {
       const status = activityStatusRef.current[code] ?? "active";
       contents[code] = { type: "text", text, status };
+    }
+    for (const [code, fields] of Object.entries(structuredInputsRef.current)) {
+      if (Object.keys(fields).length > 0) {
+        const status = activityStatusRef.current[code] ?? "active";
+        contents[code] = { type: "structured", fields, status };
+      }
     }
     if (selectedStandardsRef.current.length > 0) {
       contents["__selected_standards"] = { type: "standards", items: selectedStandardsRef.current };
@@ -1286,21 +1354,30 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     scheduleSave(code, content);
   }, [scheduleSave]);
 
+  // ── 구조화 카드 변경 ─────────────────────────────────────────
+  const handleStructuredChange = useCallback((code: string, fields: Record<string, unknown>) => {
+    setStructuredInputs(prev => ({ ...prev, [code]: fields }));
+    setTitleSaveStatus("idle");
+    const status = activityStatusRef.current[code] ?? "active";
+    const content = { type: "structured", fields, status };
+    pendingContent.current[code] = content;
+    scheduleSave(code, content);
+  }, [scheduleSave]);
+
   // ── 완료 / 건너뛰기 ──────────────────────────────────────────
   const handleActivityStatusChange = useCallback(async (code: string, newStatus: "active" | "completed" | "skipped") => {
     activityStatusRef.current = { ...activityStatusRef.current, [code]: newStatus };
     setActivityStatus((prev) => ({ ...prev, [code]: newStatus }));
     setTitleSaveStatus("saved");
-    const text = activityInputs[code] ?? "";
-    const rows = code === "T-2-1" ? undefined : undefined;
-    const content = code === "T-2-1"
-      ? { type: "role_table", rows: roleRows, status: newStatus }
-      : { type: "text", text, status: newStatus };
+    const isStructured = !!CARD_SCHEMAS[code];
+    const content = isStructured
+      ? { type: "structured", fields: structuredInputsRef.current[code] ?? {}, status: newStatus }
+      : { type: "text", text: activityInputs[code] ?? "", status: newStatus };
     createClient().from("activity_contents").upsert(
       { lesson_id: lessonId, activity_code: code, content },
       { onConflict: "lesson_id,activity_code" }
     );
-  }, [lessonId, activityInputs, roleRows]);
+  }, [lessonId, activityInputs]);
 
   // ── 역할 분담 변경 ───────────────────────────────────────────
   const handleRoleRowChange = useCallback((index: number, field: "name" | "role", value: string) => {
@@ -1362,6 +1439,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   useEffect(() => { projectTitleRef.current = projectTitle; }, [projectTitle]);
   // 버전 생성 클로저용 ref 동기화
   useEffect(() => { activityInputsRef.current = activityInputs; }, [activityInputs]);
+  useEffect(() => { structuredInputsRef.current = structuredInputs; }, [structuredInputs]);
   useEffect(() => { opinionsRef.current = opinions; }, [opinions]);
   useEffect(() => { opinionResponsesRef.current = opinionResponses; }, [opinionResponses]);
   useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
@@ -1390,6 +1468,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       for (const [code, text] of Object.entries(activityInputsRef.current)) {
         const status = activityStatusRef.current[code] ?? "active";
         contents[code] = { type: "text", text, status };
+      }
+      for (const [code, fields] of Object.entries(structuredInputsRef.current)) {
+        if (Object.keys(fields).length > 0) {
+          const status = activityStatusRef.current[code] ?? "active";
+          contents[code] = { type: "structured", fields, status };
+        }
       }
       fetch("/api/snapshot", {
         method: "POST",
@@ -1490,6 +1574,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
             const restoredOpinions: Record<string, { question: string; hidden: boolean; actCode: string }> = {};
             const restoredOpinionResponses: Record<string, Record<string, string>> = {};
+            const restoredStructured: Record<string, Record<string, unknown>> = {};
             for (const [code, c] of Object.entries(contents)) {
               if (code === "__selected_standards" && Array.isArray(c.items)) {
                 const items = c.items as StandardItem[];
@@ -1520,6 +1605,10 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 restoredOpinionResponses[opinionKey][uid] = (c.response as string) ?? "";
                 continue;
               }
+              if (c.type === "structured" && c.fields) {
+                restoredStructured[code] = c.fields;
+                continue;
+              }
               if (c.text !== undefined) inputs[code] = c.text;
               if (c.status === "completed" || c.status === "skipped") statusMap[code] = c.status;
             }
@@ -1528,6 +1617,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             activityStatusRef.current = statusMap;
             if (Object.keys(restoredOpinions).length > 0) { setOpinions(restoredOpinions); opinionsRef.current = restoredOpinions; }
             if (Object.keys(restoredOpinionResponses).length > 0) { setOpinionResponses(restoredOpinionResponses); opinionResponsesRef.current = restoredOpinionResponses; }
+            if (Object.keys(restoredStructured).length > 0) { setStructuredInputs(restoredStructured); structuredInputsRef.current = restoredStructured; }
             setActiveModal(null);
           }}
         />
@@ -1605,12 +1695,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                       const actCode = opinionModal;
                       const opinionKey = `${actCode}__${Date.now()}`;
                       const q = opinionDraft.trim();
-                      // DB 저장 (페이지 새로고침 대비)
-                      createClient().from("activity_contents").insert(
-                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } }
-                      );
-                      // Broadcast로 모든 참여자에게 즉시 전파
-                      opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      createClient().from("activity_contents").upsert(
+                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } },
+                        { onConflict: "lesson_id,activity_code" }
+                      ).then(({ error }) => {
+                        if (error) console.error("[opinion] DB save error:", error.message);
+                        else opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      });
                       setOpinions((prev) => ({ ...prev, [opinionKey]: { question: q, hidden: false, actCode } }));
                       setOpinionModal(null);
                       setOpinionDraft("");
@@ -1635,12 +1726,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                       const actCode = opinionModal;
                       const opinionKey = `${actCode}__${Date.now()}`;
                       const q = opinionDraft.trim();
-                      // DB 저장 (페이지 새로고침 대비)
-                      createClient().from("activity_contents").insert(
-                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } }
-                      );
-                      // Broadcast로 모든 참여자에게 즉시 전파
-                      opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      createClient().from("activity_contents").upsert(
+                        { lesson_id: lessonId, activity_code: `${opinionKey}__opinion`, content: { type: "opinion", question: q, active: true } },
+                        { onConflict: "lesson_id,activity_code" }
+                      ).then(({ error }) => {
+                        if (error) console.error("[opinion] DB save error:", error.message);
+                        else opinionChannelRef.current?.send({ type: "broadcast", event: "question", payload: { opinionKey, actCode, question: q } });
+                      });
                       setOpinions((prev) => ({ ...prev, [opinionKey]: { question: q, hidden: false, actCode } }));
                       setOpinionModal(null);
                       setOpinionDraft("");
@@ -2168,28 +2260,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                         </div>
 
                         {/* 입력 영역 */}
-                        {act.code === "T-2-1" ? (
-                          <div className="grid grid-cols-2 gap-3" onClick={(e) => e.stopPropagation()}>
-                            {roleRows.map((row, i) => (
-                              <div key={i} className="flex overflow-hidden rounded-xl bg-[#f1f4f9]">
-                                <input
-                                  value={row.name}
-                                  onChange={(e) => handleRoleRowChange(i, "name", e.target.value)}
-                                  disabled={locked}
-                                  placeholder={i === 0 ? "팀장 이름" : "이름"}
-                                  className="w-[40%] border-none bg-transparent px-3 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none disabled:opacity-50"
-                                />
-                                <div className="w-px bg-[#adb2ba]/30 self-stretch" />
-                                <input
-                                  value={row.role}
-                                  onChange={(e) => handleRoleRowChange(i, "role", e.target.value)}
-                                  disabled={locked}
-                                  placeholder="역할"
-                                  className="flex-1 border-none bg-transparent px-3 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none disabled:opacity-50"
-                                />
-                              </div>
-                            ))}
-                          </div>
+                        {CARD_SCHEMAS[act.code] ? (
+                          <CardFieldRenderer
+                            schema={CARD_SCHEMAS[act.code]}
+                            value={structuredInputs[act.code] ?? {}}
+                            onChange={(fields) => handleStructuredChange(act.code, fields)}
+                            locked={locked}
+                          />
                         ) : (
                           <textarea
                             value={activityInputs[act.code] ?? ""}
@@ -2268,12 +2345,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                           if (e.key === "Enter" && !e.shiftKey) {
                                             e.preventDefault();
                                             const resp = myOpinionDrafts[opinionKey]?.trim();
-                                            if (!resp) return;
+                                            if (!resp || !myId) return;
                                             createClient().from("activity_contents").upsert(
                                               { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
                                               { onConflict: "lesson_id,activity_code" }
-                                            );
-                                            opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                            ).then(({ error }) => {
+                                              if (error) console.error("[opinion response] DB save error:", error.message);
+                                              else opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                            });
                                             setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
                                             setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
                                             setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
@@ -2284,15 +2363,17 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                         className="flex-1 rounded-lg border border-[#dde3eb] bg-white px-3 py-2 text-[14px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:border-[#5044e3]"
                                       />
                                       <button
-                                        disabled={!myOpinionDrafts[opinionKey]?.trim()}
+                                        disabled={!myOpinionDrafts[opinionKey]?.trim() || !myId}
                                         onClick={() => {
                                           const resp = myOpinionDrafts[opinionKey]?.trim();
-                                          if (!resp) return;
+                                          if (!resp || !myId) return;
                                           createClient().from("activity_contents").upsert(
                                             { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
                                             { onConflict: "lesson_id,activity_code" }
-                                          );
-                                          opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                          ).then(({ error }) => {
+                                            if (error) console.error("[opinion response] DB save error:", error.message);
+                                            else opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+                                          });
                                           setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
                                           setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
                                           setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
@@ -2359,6 +2440,51 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {/* ── 우측 패널 ────────────────────────────────────────────── */}
           <div className="flex w-[30%] min-w-[360px] shrink-0 flex-col bg-white shadow-[-4px_0px_24px_rgba(45,51,57,0.06)]">
 
+            {/* 알림 패널 */}
+            {pendingOpinionsList.length > 0 && (
+              <div className="shrink-0 border-b border-[#adb2ba]/20">
+                <button
+                  onClick={() => setNotifOpen((v) => !v)}
+                  className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-[#f8f9ff] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#44c4b8] text-[11px] font-bold text-white">
+                      {pendingOpinionsList.length}
+                    </span>
+                    <span className="text-[13px] font-medium text-[#5a6066]">
+                      {pendingOpinionsList.length}개의 알림이 있습니다.
+                    </span>
+                  </div>
+                  <svg
+                    className={`h-4 w-4 text-[#adb2ba] transition-transform ${notifOpen ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {notifOpen && (
+                  <div className="border-t border-[#eef0f6] bg-[#f8f9ff] px-3 pb-2 pt-1">
+                    {pendingOpinionsList.map(({ opinionKey, actCode, question, phaseCode }) => (
+                      <button
+                        key={opinionKey}
+                        onClick={() => {
+                          setActivePhase(phaseCode);
+                          setSelectedActivityCode(actCode);
+                          setNotifOpen(false);
+                        }}
+                        className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition hover:bg-white"
+                      >
+                        <span className="mt-0.5 shrink-0 rounded-md bg-[#ede9fb] px-1.5 py-0.5 text-[11px] font-bold text-[#5044e3]">
+                          {actCode}
+                        </span>
+                        <span className="text-[13px] leading-snug text-[#2d3339] line-clamp-2">{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 탭 헤더 */}
             <div className="shrink-0 flex bg-white border-b border-[#adb2ba]/20">
               <button
@@ -2411,11 +2537,20 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                     }
                     return acc;
                   }, []);
+                  // 구조화 카드 데이터를 텍스트로 직렬화하여 activityInputs에 병합
+                  const mergedInputs: Record<string, string> = {
+                    ...activityInputs,
+                    ...Object.fromEntries(
+                      Object.entries(structuredInputs).map(([code, fields]) => [
+                        code, serializeStructuredForAI(fields),
+                      ])
+                    ),
+                  };
                   return {
                     projectTitle,
                     activePhase,
                     activeSection,
-                    activityInputs,
+                    activityInputs: mergedInputs,
                     selectedActivityCode: selectedActivityCode ?? undefined,
                     referenceFiles: referenceFiles.length > 0 ? referenceFiles : undefined,
                     selectedStandards: selectedStandards.length > 0 ? selectedStandards : undefined,

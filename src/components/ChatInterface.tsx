@@ -37,6 +37,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   const [timestamps, setTimestamps] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,40 +65,61 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
   const isInitialLoad = useRef(true);
 
+  // stage별 메시지 캐시 — 이미 로드한 stage는 DB 재요청 없이 즉시 복원
+  const msgCache = useRef<Map<string, { messages: Message[]; timestamps: string[] }>>(new Map());
+
   // userId를 ref로 유지 — stage 의존성에서 제외해 불필요한 재로드 방지
   const userIdRef = useRef(userId);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
-  // 단계 전환 시 DB에서 대화 기록 로드
+  // 단계 전환 시 캐시 우선, 없으면 DB 로드
   useEffect(() => {
     if (!lessonId) {
       setMessages([]);
       setTimestamps([]);
       return;
     }
-    isInitialLoad.current = true; // stage 바뀔 때마다 즉시 스크롤 리셋
+    isInitialLoad.current = true;
+
+    // 캐시 히트 → 즉시 복원, DB 요청 없음
+    const cached = msgCache.current.get(stage);
+    if (cached) {
+      setMessages(cached.messages);
+      setTimestamps(cached.timestamps);
+      return;
+    }
+
+    setMessages([]);
+    setTimestamps([]);
+    setIsLoadingHistory(true);
     const load = async () => {
-      // userId가 아직 없으면 auth에서 직접 가져옴
-      const uid = userIdRef.current || authUidRef.current || (await createClient().auth.getUser().then(({ data }) => {
-        if (data.user) { authUidRef.current = data.user.id; userIdRef.current = data.user.id; }
-        return data.user?.id ?? null;
-      }));
-      if (!uid) return;
-      const { data } = await createClient()
-        .from('ai_messages')
-        .select('role, content, created_at')
-        .eq('lesson_id', lessonId)
-        .eq('user_id', uid)
-        .eq('context_activity_code', stage)
-        .order('created_at', { ascending: true });
-      if (!data) return;
-      setMessages(data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content })));
-      setTimestamps(data.map((r) => {
-        const d = new Date(r.created_at);
-        const h = d.getHours();
-        const m = String(d.getMinutes()).padStart(2, '0');
-        return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
-      }));
+      try {
+        const uid = userIdRef.current || authUidRef.current || (await createClient().auth.getUser().then(({ data }) => {
+          if (data.user) { authUidRef.current = data.user.id; userIdRef.current = data.user.id; }
+          return data.user?.id ?? null;
+        }));
+        if (!uid) return;
+        const { data } = await createClient()
+          .from('ai_messages')
+          .select('role, content, created_at')
+          .eq('lesson_id', lessonId)
+          .eq('user_id', uid)
+          .eq('context_activity_code', stage)
+          .order('created_at', { ascending: true });
+        if (!data) return;
+        const msgs = data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
+        const tss = data.map((r) => {
+          const d = new Date(r.created_at);
+          const h = d.getHours();
+          const m = String(d.getMinutes()).padStart(2, '0');
+          return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
+        });
+        msgCache.current.set(stage, { messages: msgs, timestamps: tss });
+        setMessages(msgs);
+        setTimestamps(tss);
+      } finally {
+        setIsLoadingHistory(false);
+      }
     };
     load();
   // userId는 ref로 처리하므로 의존성에서 제외
@@ -105,6 +127,8 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   }, [stage, lessonId]);
 
   useEffect(() => {
+    // messages가 빈 상태(DB 로드 전)에서 초기 플래그를 소비하지 않도록 스킵
+    if (messages.length === 0) return;
     if (isInitialLoad.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'instant' });
       isInitialLoad.current = false;
@@ -188,6 +212,12 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
         });
       }
 
+      // 스트리밍 완료 후 캐시 업데이트
+      setMessages((prev) => {
+        msgCache.current.set(stage, { messages: prev, timestamps: [...newTimestamps, nowTimestamp()] });
+        return prev;
+      });
+
       // AI 응답 DB 저장 (스트리밍 완료 후)
       if (lessonId && saveUid && accumulated) {
         createClient().from('ai_messages').insert({
@@ -227,7 +257,16 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     <div className="flex flex-col h-full bg-white">
       {/* 메시지 목록 */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
+        {isLoadingHistory ? (
+          <div className="flex flex-col gap-3 pt-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className={`flex gap-2 ${i % 2 === 0 ? '' : 'flex-row-reverse'}`}>
+                <div className="h-7 w-7 shrink-0 rounded-full bg-gray-100 animate-pulse" />
+                <div className={`h-10 rounded-2xl bg-gray-100 animate-pulse ${i % 2 === 0 ? 'w-3/4' : 'w-1/2'}`} />
+              </div>
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#44c4b8] text-xs font-bold text-white">
               M
@@ -235,7 +274,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
             <p className="text-sm font-semibold text-[#2d3339]">Minerva AI</p>
             <p className="text-sm text-[#757b82]">무엇이든 질문해 보세요.</p>
           </div>
-        )}
+        ) : null}
         {messages.map((msg, i) => {
           const prev = messages[i - 1];
           const next = messages[i + 1];
