@@ -51,12 +51,12 @@ type CardContent = {
   final_topic?: string;
   selection_rationale?: string;
   core_ideas?: Array<{ subject: string; core_idea: string }>;
-  achievement_standards?: Array<{ subject: string; code: string; statement: string }>;
+  achievement_standards?: Array<{ subject: string; code?: string; statement?: string; standard?: string }>;
   integration_narrative?: string;
   integrated_goal?: string;
   eval_questions?: string[];
   eval_methods?: Array<{ type: string; target: string; method: string; timing: string }>;
-  rubric?: Array<{ axis: string; level_4: string; level_3: string; level_2: string }>;
+  rubric?: Array<{ axis: string; level_high: string; level_mid: string; level_low: string; level_4?: string; level_3?: string; level_2?: string }>;
   problem_situations?: Array<{ situation: string; decision: string }>;
   activities?: Array<{ period: string; activity: string; linked_standards: string[] }>;
   support_tools?: Array<{ stage: string; tool: string; purpose: string; related_period: string }>;
@@ -323,9 +323,12 @@ function renderTocOverview(d: RenderData): string {
       ? (A21!.achievement_standards ?? [])
       : d.standards.map((s) => ({ subject: s.subject, code: s.code, statement: s.content }));
     const stdHtml = stdList.length > 0
-      ? `<ul class="bullets">${stdList.map((s) =>
-          `<li>• <strong>[${esc(s.code)}]</strong> ${esc(s.statement)}</li>`
-        ).join("")}</ul>`
+      ? `<ul class="bullets">${stdList.map((s) => {
+          const text = s.code
+            ? `<strong>[${esc(s.code)}]</strong> ${esc(s.statement)}`
+            : esc((s as Record<string, unknown>).standard as string ?? s.statement ?? "");
+          return `<li>• ${text}</li>`;
+        }).join("")}</ul>`
       : "(미입력)";
 
     // 핵심 아이디어 요약
@@ -523,10 +526,12 @@ function renderChapterA(d: RenderData): string {
     if (stdList.length > 0) {
       s23 += table(
         ["교과", "성취기준"],
-        stdList.map((s) => [
-          s.subject,
-          { html: `<strong>[${esc(s.code)}]</strong> ${esc(s.statement)}` },
-        ]),
+        stdList.map((s) => {
+          const inner = s.code
+            ? `<strong>[${esc(s.code)}]</strong> ${esc(s.statement)}`
+            : nl2br((s as Record<string, unknown>).standard as string ?? s.statement ?? "");
+          return [s.subject, { html: inner }];
+        }),
         { colWidthsMm: [22, 148] }
       );
     } else {
@@ -583,8 +588,8 @@ function renderChapterDs(d: RenderData): string {
       if (hasField(Ds11, "rubric")) {
         s31 += `<h3 class="sub">3.1.3 평가 기준 (수행 루브릭)</h3>`;
         s31 += table(
-          ["평가 축", "수준 4 (우수)", "수준 3 (적절)", "수준 2 (미흡)"],
-          (Ds11!.rubric ?? []).map((r) => [r.axis, r.level_4, r.level_3, r.level_2]),
+          ["평가 축", "상", "중", "하"],
+          (Ds11!.rubric ?? []).map((r) => [r.axis, r.level_high ?? r.level_4 ?? "", r.level_mid ?? r.level_3 ?? "", r.level_low ?? r.level_2 ?? ""]),
           { colWidthsMm: [28, 47, 47, 48] }
         );
       }
@@ -892,7 +897,20 @@ export async function GET(req: Request) {
         opinionResMap[key][uid] = c?.response ?? "";
         continue;
       }
-      contents[code] = c;
+      // structured 카드: { type:"structured", fields:{...}, status } → 플랫 CardContent로 언래핑
+      if ((c as Record<string, unknown>).type === "structured" && (c as Record<string, unknown>).fields) {
+        const fields = (c as Record<string, unknown>).fields as CardContent;
+        contents[code] = { ...fields, status: c.status };
+      } else if ((c as Record<string, unknown>).type === "role_table" && code === "T-2-1" && (c as Record<string, unknown>).rows) {
+        // 레거시 T-2-1 포맷
+        const rows = (c as Record<string, unknown>).rows as { name: string; role: string }[];
+        contents[code] = {
+          status: c.status,
+          roles: rows.map((r) => ({ name: r.name ?? "", subject: "", core_role: r.role ?? "", area: "" })),
+        } as CardContent;
+      } else {
+        contents[code] = c;
+      }
     }
 
     // 의견묻기 응답자 이름 매핑
