@@ -23,6 +23,7 @@ interface Props {
   pageContext?: PageContext;
   lessonId?: string;
   userId?: string;
+  triggerMessage?: string; // auto-sends when changed
 }
 
 function nowTimestamp() {
@@ -32,7 +33,7 @@ function nowTimestamp() {
   return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
 }
 
-export default function ChatInterface({ stage, onReady, pageContext, lessonId, userId }: Props) {
+export default function ChatInterface({ stage, onReady, pageContext, lessonId, userId, triggerMessage }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [timestamps, setTimestamps] = useState<string[]>([]);
   const [input, setInput] = useState('');
@@ -43,6 +44,9 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // auth UID를 ref로 캐시 — 소유자/참여자 모두 동일하게 auth.uid() 사용
   const authUidRef = useRef<string | null>(null);
+  // triggerMessage auto-send
+  const sendMessageRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const lastTriggerRef = useRef<string>('');
 
   // 마운트 시: auth UID 캐시 + API 연결 확인
   useEffect(() => {
@@ -245,6 +249,18 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       setIsStreaming(false);
     }
   };
+
+  // keep ref up-to-date so triggerMessage effect always calls latest sendMessage
+  sendMessageRef.current = sendMessage;
+
+  // auto-send when triggerMessage changes
+  useEffect(() => {
+    if (!triggerMessage || triggerMessage === lastTriggerRef.current) return;
+    lastTriggerRef.current = triggerMessage;
+    const t = setTimeout(() => sendMessageRef.current(triggerMessage), 120);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

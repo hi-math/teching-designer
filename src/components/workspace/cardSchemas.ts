@@ -69,12 +69,12 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
   'T-1-2': {
     fields: [
-      bl('directions', '수업설계 방향'),
+      bl('directions'),
     ],
   },
   'T-2-1': {
     fields: [
-      tb('roles', '역할 배분', [
+      tb('roles', undefined, [
         { key: 'name',      label: '이름',      type: 'text', flex: 1 },
         { key: 'subject',   label: '과목',      type: 'text', flex: 1 },
         { key: 'core_role', label: '핵심 역할', type: 'text', flex: 2 },
@@ -84,12 +84,12 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
   'T-2-2': {
     fields: [
-      bl('rules', '팀 규칙'),
+      bl('rules'),
     ],
   },
   'T-2-3': {
     fields: [
-      tb('schedule', '단계별 일정', [
+      tb('schedule', undefined, [
         { key: 'due_date',    label: '목표 완료일', type: 'date', flex: 1.5, align: 'center' },
         { key: 'content',     label: '내용',       type: 'text', flex: 3 },
         { key: 'deliverable', label: '산출물',     type: 'text', flex: 2 },
@@ -100,7 +100,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   // ── 2단계: 분석 ─────────────────────────────────────────────────
   'A-1-1': {
     fields: [
-      bl('criteria', '주제 선정 기준'),
+      bl('criteria'),
     ],
   },
   'A-1-2': {

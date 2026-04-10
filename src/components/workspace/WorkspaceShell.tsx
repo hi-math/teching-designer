@@ -62,7 +62,7 @@ const PHASE_SECTIONS: Record<string, PhaseSection[]> = {
     {
       code: "A-2", label: "핵심 아이디어 분석", tabLabel: "학습 내용 분석 및 목표 진술",
       activities: [
-        { code: "A-2-1", label: "핵심 아이디어 및 성취 기준 분석", description: "팀원들은 선정된 주제와 관련하여 학습자들이 학습해야 할 내용과 기능요소를 나열하고, 팀 자원에서 핵심적으로 반영할 내용과 기능을 조정한다." },
+        { code: "A-2-1", label: "성취 기준 분석", description: "팀원들은 선정된 주제와 관련하여 학습자들이 학습해야 할 내용과 기능요소를 나열하고, 팀 자원에서 핵심적으로 반영할 내용과 기능을 조정한다." },
         { code: "A-2-2", label: "통합된 수업 목표", description: "팀원들은 내용요소, 기능요소 등을 결합하여 통합된 수업목표를 진술한다." },
       ],
     },
@@ -754,10 +754,11 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"team" | "ai">("team");
   const [notifOpen, setNotifOpen] = useState(false);
+  const [chatTrigger, setChatTrigger] = useState('');
+  const notifHeaderRef = useRef<HTMLDivElement>(null);
   const [structuredInputs, setStructuredInputs] = useState<Record<string, Record<string, unknown>>>({});
   const [aiReady, setAiReady] = useState(false);
   const [activityInputs, setActivityInputs] = useState<Record<string, string>>({});
@@ -1420,6 +1421,17 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!notifOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (notifHeaderRef.current && !notifHeaderRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [notifOpen]);
+
   const handleLogout = async () => {
     setMenuOpen(false);
     const supabase = createClient();
@@ -1431,6 +1443,20 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     setMenuOpen(false);
     setProfileModalOpen(true);
   };
+
+  // ── 프로젝트 온보딩 (첫 방문 시 AI 안내) ───────────────────────
+  useEffect(() => {
+    if (!lessonId) return;
+    const key = `minerva_onboarded_${lessonId}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+    const t = setTimeout(() => {
+      setRightTab('ai');
+      setChatTrigger(`안녕하세요! 수업 설계 프로젝트를 시작하신 것을 환영합니다. Minerva의 간단한 사용법과 첫 번째 단계(팀 준비)에서 무엇을 해야 하는지 안내해 주세요.`);
+    }, 1200);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
 
 
   // projectTitle을 ref에 동기화 (beforeunload 클로저용)
@@ -1867,8 +1893,56 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             </span>
           </div>
         </div>
-        {/* 우: 멤버 아바타 + 액션 버튼 */}
+        {/* 우: 알림 + 멤버 아바타 + 액션 버튼 */}
         <div className="flex shrink-0 items-center gap-3">
+          {/* 알림 아코디언 */}
+          {pendingOpinionsList.length > 0 && (
+            <div className="relative" ref={notifHeaderRef}>
+              <button
+                onClick={() => setNotifOpen(v => !v)}
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition hover:bg-white/15"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-400 text-[11px] font-bold text-white">
+                  {pendingOpinionsList.length}
+                </span>
+                <span className="text-[14px] font-semibold text-white whitespace-nowrap">
+                  {pendingOpinionsList.length}개의 알림이 있습니다
+                </span>
+                <svg
+                  className={`h-3.5 w-3.5 text-white transition-transform ${notifOpen ? "rotate-180" : ""}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-[#eef0f6] bg-white shadow-xl">
+                  <div className="px-3 py-2 border-b border-[#eef0f6]">
+                    <p className="text-[12px] font-semibold uppercase tracking-wider text-[#adb2ba]">미응답 의견묻기</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto px-2 py-1.5">
+                    {pendingOpinionsList.map(({ opinionKey, actCode, question, phaseCode }) => (
+                      <button
+                        key={opinionKey}
+                        onClick={() => {
+                          setActivePhase(phaseCode);
+                          setSelectedActivityCode(actCode);
+                          setNotifOpen(false);
+                        }}
+                        className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition hover:bg-[#f8f9ff]"
+                      >
+                        <span className="mt-0.5 shrink-0 rounded-md bg-[#ede9fb] px-1.5 py-0.5 text-[11px] font-bold text-[#5044e3]">
+                          {actCode}
+                        </span>
+                        <span className="text-[13px] leading-snug text-[#2d3339] line-clamp-2">{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 전체 멤버 아바타 (본인 포함) */}
           {(() => {
             const me: Member | null = userProfile
@@ -1912,12 +1986,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               </div>
             ) : null;
           })()}
-
-          {pendingOpinionsList.length > 0 && (
-            <span className="text-[13px] font-medium text-white/90 whitespace-nowrap">
-              {pendingOpinionsList.length}개의 알림이 있습니다
-            </span>
-          )}
 
           <button
             onClick={() => setShareModalOpen(true)}
@@ -2226,11 +2294,11 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                           setSelectedActivityCode(act.code);
                           setRightTab("ai");
                         }}
-                        className={`mb-6 rounded-2xl p-6 border transition-colors cursor-pointer ${
+                        className={`mb-6 rounded-2xl p-6 border transition-all cursor-pointer ${
                           st === "completed" ? "bg-[#eff8ff] border-[#bae0ff]"
                           : st === "skipped"  ? "bg-[#f5f6f8] border-[#e2e4ea]"
                           : "bg-white border-transparent"
-                        } ${selectedActivityCode === act.code ? "ring-2 ring-[#5044e3]" : ""}`}
+                        } ${selectedActivityCode === act.code ? "shadow-[0_4px_24px_rgba(80,68,227,0.12)]" : ""}`}
                       >
                         {/* 헤더: 코드 + 토글 버튼 */}
                         <div className="mb-2 flex items-center justify-between">
@@ -2275,16 +2343,34 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
                         {/* 제목 + 설명 */}
                         <div className="mb-4 flex flex-col gap-1.5">
-                          <div>
-                            <h3 className={`text-xl font-semibold ${locked ? "text-[#adb2ba]" : "text-[#2d3339]"}`}>
-                              {act.label}
-                            </h3>
-                            {act.badge && (
-                              <span className="mt-1 inline-block rounded-full bg-[#f1f4f9] px-2.5 py-1 text-xs text-[#757b82]">
-                                {act.badge}
-                              </span>
-                            )}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className={`text-xl font-semibold ${locked ? "text-[#adb2ba]" : "text-[#2d3339]"}`}>
+                                {act.label}
+                              </h3>
+                              {act.badge && (
+                                <span className="mt-1 inline-block rounded-full bg-[#f1f4f9] px-2.5 py-1 text-xs text-[#757b82]">
+                                  {act.badge}
+                                </span>
+                              )}
+                            </div>
+                            {/* AI 안내 버튼 */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedActivityCode(act.code);
+                                setRightTab('ai');
+                                setChatTrigger(`${act.code} "${act.label}" 카드 작성법을 안내해 주세요. 어떤 내용을 어떻게 입력하면 좋은지 구체적으로 알려주세요.`);
+                              }}
+                              title="AI 안내"
+                              className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-teal-50 text-teal-600 hover:bg-teal-100 transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
                           </div>
+                          <p className="text-[15px] leading-relaxed text-[#5a6066]">{act.description}</p>
                         </div>
 
                         {/* A-2-1 검색 버튼 */}
@@ -2492,51 +2578,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {/* ── 우측 패널 ────────────────────────────────────────────── */}
           <div className="flex w-[30%] min-w-[360px] shrink-0 flex-col bg-white shadow-[-4px_0px_24px_rgba(45,51,57,0.06)]">
 
-            {/* 알림 패널 */}
-            {pendingOpinionsList.length > 0 && (
-              <div className="shrink-0 border-b border-[#adb2ba]/20">
-                <button
-                  onClick={() => setNotifOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-[#f8f9ff] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#44c4b8] text-[11px] font-bold text-white">
-                      {pendingOpinionsList.length}
-                    </span>
-                    <span className="text-[13px] font-medium text-[#5a6066]">
-                      {pendingOpinionsList.length}개의 알림이 있습니다.
-                    </span>
-                  </div>
-                  <svg
-                    className={`h-4 w-4 text-[#adb2ba] transition-transform ${notifOpen ? "rotate-180" : ""}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {notifOpen && (
-                  <div className="border-t border-[#eef0f6] bg-[#f8f9ff] px-3 pb-2 pt-1">
-                    {pendingOpinionsList.map(({ opinionKey, actCode, question, phaseCode }) => (
-                      <button
-                        key={opinionKey}
-                        onClick={() => {
-                          setActivePhase(phaseCode);
-                          setSelectedActivityCode(actCode);
-                          setNotifOpen(false);
-                        }}
-                        className="flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition hover:bg-white"
-                      >
-                        <span className="mt-0.5 shrink-0 rounded-md bg-[#ede9fb] px-1.5 py-0.5 text-[11px] font-bold text-[#5044e3]">
-                          {actCode}
-                        </span>
-                        <span className="text-[13px] leading-snug text-[#2d3339] line-clamp-2">{question}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* 탭 헤더 */}
             <div className="shrink-0 flex bg-white border-b border-[#adb2ba]/20">
               <button
@@ -2569,6 +2610,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               <ChatInterface
                 stage={activePhase}
                 onReady={() => setAiReady(true)}
+                triggerMessage={chatTrigger}
                 pageContext={(() => {
                   // 의견묻기 데이터를 멤버 이름으로 매핑
                   const allMembers = [
