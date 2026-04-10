@@ -1913,6 +1913,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             ) : null;
           })()}
 
+          {pendingOpinionsList.length > 0 && (
+            <span className="text-[13px] font-medium text-white/90 whitespace-nowrap">
+              {pendingOpinionsList.length}개의 알림이 있습니다
+            </span>
+          )}
+
           <button
             onClick={() => setShareModalOpen(true)}
             className="flex h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 text-[16px] font-medium text-white transition hover:bg-white/25"
@@ -2237,8 +2243,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "completed" ? "active" : "completed"); }}
                                 className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                   st === "completed"
-                                    ? "bg-[#bae0ff] text-[#0369a1]"
-                                    : "bg-[#e8ebf0] text-[#5a6066] hover:bg-[#dde1e8]"
+                                    ? "bg-teal-200 text-teal-800"
+                                    : "bg-teal-50 text-teal-700 hover:bg-teal-100"
                                 }`}
                               >
                                 완료
@@ -2250,7 +2256,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                 className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                   st === "skipped"
                                     ? "bg-[#e2e4ea] text-[#5a6066]"
-                                    : "bg-[#e8ebf0] text-[#5a6066] hover:bg-[#dde1e8]"
+                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                                 }`}
                               >
                                 건너뛰기
@@ -2259,7 +2265,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             {isHost && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
-                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#e8ebf0] text-[#5a6066] hover:bg-[#ede9fb] hover:text-[#5044e3]"
+                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                               >
                                 의견묻기
                               </button>

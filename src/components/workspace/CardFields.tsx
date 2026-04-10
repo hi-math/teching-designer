@@ -100,6 +100,42 @@ function BulletsInput({
   );
 }
 
+// ─── Badge color per option value ─────────────────────────────────────
+
+const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  // 평가 유형
+  '진단':   { bg: '#dbeafe', text: '#1d4ed8' },
+  '형성':   { bg: '#dcfce7', text: '#15803d' },
+  '수행':   { bg: '#ffedd5', text: '#c2410c' },
+  '총괄':   { bg: '#ede9fe', text: '#6d28d9' },
+  // 채택 여부
+  '채택':             { bg: '#d1fae5', text: '#065f46' },
+  '보조 자료로 활용': { bg: '#e0f2fe', text: '#0369a1' },
+  '보류':             { bg: '#fef3c7', text: '#92400e' },
+  '미채택':           { bg: '#fee2e2', text: '#b91c1c' },
+};
+
+// 교과 배지 색 (StandardsModal/IdeasModal과 동일)
+const LANGUAGE = new Set(['국어','영어','한문','생활 독일어','생활 러시아어','생활 베트남어','생활 스페인어','생활 아랍어','생활 일본어','생활 중국어','생활 프랑스어']);
+const MATH     = new Set(['수학']);
+const SCIENCE  = new Set(['과학','정보','기술·가정']);
+const SOCIAL   = new Set(['사회','역사','도덕']);
+const ARTS     = new Set(['체육','음악','미술']);
+
+function getSubjectBadge(subject: string): { bg: string; text: string } {
+  if (LANGUAGE.has(subject)) return { bg: '#dbeafe', text: '#1d4ed8' };
+  if (MATH.has(subject))     return { bg: '#ede9fe', text: '#6d28d9' };
+  if (SCIENCE.has(subject))  return { bg: '#d1fae5', text: '#065f46' };
+  if (SOCIAL.has(subject))   return { bg: '#ffedd5', text: '#92400e' };
+  if (ARTS.has(subject))     return { bg: '#fce7f3', text: '#9d174d' };
+  return { bg: '#e0f2fe', text: '#0369a1' };
+}
+
+function getBadgeStyle(value: string, isSubject: boolean): { bg: string; text: string } {
+  if (isSubject) return getSubjectBadge(value);
+  return BADGE_COLORS[value] ?? { bg: '#f1f4f9', text: '#5a6066' };
+}
+
 // ─── Table cell ────────────────────────────────────────────────────────
 
 function TableCell({
@@ -119,6 +155,7 @@ function TableCell({
   if (col.type === 'select' || col.type === 'subject-select') {
     const opts = col.type === 'subject-select' ? (dynamicOptions ?? []) : (col.options ?? []);
     const hasValue = value !== '' && value !== undefined;
+    const badge = hasValue ? getBadgeStyle(value, col.type === 'subject-select') : null;
     return (
       <div className="relative w-full">
         <select
@@ -126,18 +163,24 @@ function TableCell({
           onChange={e => onChange(e.target.value)}
           disabled={locked}
           className={`${base} cursor-pointer appearance-none pr-6`}
-          style={hasValue ? {
-            // badge-like styling for selected state
-          } : {}}
+          style={{ color: hasValue ? 'transparent' : undefined }}
         >
           <option value="">—</option>
           {opts.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
-        {hasValue && (
+        {badge && (
           <div className="pointer-events-none absolute inset-0 flex items-center px-3">
-            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[12px] font-medium text-teal-700 whitespace-nowrap">
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[12px] font-medium whitespace-nowrap"
+              style={{ backgroundColor: badge.bg, color: badge.text }}
+            >
               {value}
             </span>
+          </div>
+        )}
+        {!hasValue && (
+          <div className="pointer-events-none absolute inset-0 flex items-center px-3">
+            <span className="text-[13px] text-[#adb2ba]">—</span>
           </div>
         )}
         <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#adb2ba]">
@@ -240,9 +283,7 @@ function TableInput({
         {field.columns.map((col) => (
           <div
             key={col.key}
-            className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] ${
-              col.align === 'center' ? 'text-center' : ''
-            }`}
+            className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] text-center"
           >
             {col.label}
           </div>
