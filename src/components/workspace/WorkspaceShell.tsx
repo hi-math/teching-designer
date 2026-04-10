@@ -1659,6 +1659,42 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           onChange={handlePermissionsChange}
           onClose={() => setActiveModal(null)}
         />
+      ) : activeModal === "핵심아이디어검색" ? (
+        <IdeasModal
+          onClose={() => setActiveModal(null)}
+          selectedIdeas={selectedIdeas}
+          onSelectionChange={(items) => {
+            setSelectedIdeas(items);
+            selectedIdeasRef.current = items;
+            const rows = items.length > 0
+              ? items.map(item => ({ subject: item.subject, core_idea: item.content }))
+              : [{ subject: '', core_idea: '' }, { subject: '', core_idea: '' }];
+            handleStructuredChange('A-2-1', { ...(structuredInputs['A-2-1'] ?? {}), core_ideas: rows });
+            createClient().from("activity_contents").upsert(
+              { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items }, updated_by: userProfile?.id ?? null },
+              { onConflict: "lesson_id,activity_code" }
+            ).then(({ error }) => { if (error) console.error("[ideas save]", error); });
+          }}
+          readOnly={!isHost}
+        />
+      ) : activeModal === "성취기준검색" ? (
+        <StandardsModal
+          onClose={() => setActiveModal(null)}
+          selectedStandards={selectedStandards}
+          onSelectionChange={(items) => {
+            setSelectedStandards(items);
+            selectedStandardsRef.current = items;
+            const rows = items.length > 0
+              ? items.map(item => ({ subject: item.subject, standard: `[${item.code}] ${item.content}` }))
+              : [{ subject: '', standard: '' }, { subject: '', standard: '' }];
+            handleStructuredChange('A-2-1', { ...(structuredInputs['A-2-1'] ?? {}), achievement_standards: rows });
+            createClient().from("activity_contents").upsert(
+              { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items }, updated_by: userProfile?.id ?? null },
+              { onConflict: "lesson_id,activity_code" }
+            ).then(({ error }) => { if (error) console.error("[standards save]", error); });
+          }}
+          readOnly={!isHost}
+        />
       ) : activeModal ? (
         <WorkModal title={activeModal} onClose={() => setActiveModal(null)} />
       ) : null}
@@ -1958,25 +1994,14 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           {!sidebarCollapsed && <p className="mb-1.5 px-3 text-[12px] font-semibold uppercase tracking-wider text-[#adb2ba]">수업설계</p>}
           {sidebarCollapsed && <div className="mb-1 mt-1 h-px bg-[#adb2ba]/30" />}
           <ul className="space-y-0.5">
-            {/* 설계도구 — 아코디언 */}
+            {/* 수업 기본정보 — 직접 모달 */}
             <WorkNavButton
               icon={<svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
-              label="기본정보"
-              active={openAccordion === "기본정보"}
+              label="수업 기본정보"
+              active={activeModal === "수업 기본정보"}
               collapsed={sidebarCollapsed}
-              onClick={() => setOpenAccordion(openAccordion === "기본정보" ? null : "기본정보")}
-            >
-              {openAccordion === "기본정보" && !sidebarCollapsed && (
-                <div className="ml-2 mt-0.5 overflow-hidden rounded-xl bg-[#f8f9fd]">
-                  {["수업 기본정보", "성취기준", "핵심아이디어"].map((sub) => (
-                    <button key={sub} onClick={() => setActiveModal(sub)}
-                      className="w-full rounded-full px-4 py-2 text-left text-[15px] text-[#757b82] transition hover:text-[#5044e3]">
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </WorkNavButton>
+              onClick={() => setActiveModal("수업 기본정보")}
+            />
             {/* 버전 관리 — 소유자만 */}
             {isHost && (
               <WorkNavButton
@@ -2213,7 +2238,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                 className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                   st === "completed"
                                     ? "bg-[#bae0ff] text-[#0369a1]"
-                                    : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
+                                    : "bg-[#e8ebf0] text-[#5a6066] hover:bg-[#dde1e8]"
                                 }`}
                               >
                                 완료
@@ -2225,7 +2250,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                 className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
                                   st === "skipped"
                                     ? "bg-[#e2e4ea] text-[#5a6066]"
-                                    : "bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#e8ebf0]"
+                                    : "bg-[#e8ebf0] text-[#5a6066] hover:bg-[#dde1e8]"
                                 }`}
                               >
                                 건너뛰기
@@ -2234,7 +2259,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                             {isHost && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
-                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#f1f4f9] text-[#adb2ba] hover:bg-[#ede9fb] hover:text-[#5044e3]"
+                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-[#e8ebf0] text-[#5a6066] hover:bg-[#ede9fb] hover:text-[#5044e3]"
                               >
                                 의견묻기
                               </button>
@@ -2254,8 +2279,31 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                               </span>
                             )}
                           </div>
-                          <p className="text-[16px] leading-relaxed text-[#5a6066]">{act.description}</p>
                         </div>
+
+                        {/* A-2-1 검색 버튼 */}
+                        {act.code === 'A-2-1' && !locked && (
+                          <div className="mb-3 flex gap-2" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setActiveModal("핵심아이디어검색"); }}
+                              className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-[13px] font-medium text-teal-700 hover:bg-teal-100 transition-colors"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                              핵심아이디어 검색
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setActiveModal("성취기준검색"); }}
+                              className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-[13px] font-medium text-teal-700 hover:bg-teal-100 transition-colors"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              성취기준 검색
+                            </button>
+                          </div>
+                        )}
 
                         {/* 입력 영역 */}
                         {CARD_SCHEMAS[act.code] ? (

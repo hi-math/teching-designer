@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { CardSchema, FieldDef, BulletsFieldDef, TableFieldDef, TableColumn } from './cardSchemas';
 
 // ─── Auto-resize textarea ─────────────────────────────────────────────
@@ -88,7 +88,7 @@ function BulletsInput({
       {!locked && (
         <button
           onClick={addRow}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium text-[#5044e3] hover:bg-[#ede9fb] transition-colors"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium text-teal-600 hover:bg-teal-50 transition-colors"
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -103,29 +103,49 @@ function BulletsInput({
 // ─── Table cell ────────────────────────────────────────────────────────
 
 function TableCell({
-  col, value, onChange, locked,
+  col, value, onChange, locked, dynamicOptions,
 }: {
   col: TableColumn;
   value: string;
   onChange: (v: string) => void;
   locked: boolean;
+  dynamicOptions?: string[];
 }) {
   const base =
-    `w-full bg-transparent px-2.5 py-2 text-[13px] text-[#2d3339] outline-none focus:bg-[#f8f9ff] disabled:opacity-50 ${
+    `w-full bg-transparent px-3 py-2 text-[13px] text-[#2d3339] outline-none focus:bg-[#f8f9ff] disabled:opacity-50 ${
       col.align === 'center' ? 'text-center' : ''
     }`;
 
-  if (col.type === 'select') {
+  if (col.type === 'select' || col.type === 'subject-select') {
+    const opts = col.type === 'subject-select' ? (dynamicOptions ?? []) : (col.options ?? []);
+    const hasValue = value !== '' && value !== undefined;
     return (
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={locked}
-        className={base + ' cursor-pointer'}
-      >
-        <option value="">—</option>
-        {col.options?.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <div className="relative w-full">
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          disabled={locked}
+          className={`${base} cursor-pointer appearance-none pr-6`}
+          style={hasValue ? {
+            // badge-like styling for selected state
+          } : {}}
+        >
+          <option value="">—</option>
+          {opts.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        {hasValue && (
+          <div className="pointer-events-none absolute inset-0 flex items-center px-3">
+            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[12px] font-medium text-teal-700 whitespace-nowrap">
+              {value}
+            </span>
+          </div>
+        )}
+        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#adb2ba]">
+          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
     );
   }
   if (col.type === 'date') {
@@ -189,28 +209,45 @@ function TableInput({
     onChange(rows.filter((_, i) => i !== idx));
   };
 
-  // CSS grid: 열 너비를 헤더·데이터 행이 공유 → 구분선 완벽 일치
+  // Fetch dynamic subjects for subject-select columns
+  const [dynamicSubjects, setDynamicSubjects] = useState<string[]>([]);
+  useEffect(() => {
+    const subjectCol = field.columns.find(c => c.type === 'subject-select');
+    if (!subjectCol) return;
+    if (subjectCol.subjectSource === 'ideas') {
+      fetch('/standard/ideas.json')
+        .then(r => r.json())
+        .then(data => setDynamicSubjects(Object.keys(data)));
+    } else if (subjectCol.subjectSource === 'standards') {
+      fetch('/api/standards?type=meta')
+        .then(r => r.json())
+        .then(data => setDynamicSubjects(data.subjects ?? []));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // CSS grid: columns share same template → borders align perfectly
   const gridTemplate =
     field.columns.map(c => `${c.flex ?? 1}fr`).join(' ') + ' 28px';
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e2e4ea]" onClick={e => e.stopPropagation()}>
+    <div className="overflow-x-auto rounded-lg border border-[#e2e4ea]" onClick={e => e.stopPropagation()}>
       {/* Header */}
       <div
         className="bg-[#f1f4f9] border-b border-[#e2e4ea]"
         style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
       >
-        {field.columns.map((col, i) => (
+        {field.columns.map((col) => (
           <div
             key={col.key}
-            className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] ${
-              i < field.columns.length - 1 ? 'border-r border-[#e2e4ea]' : ''
-            } ${col.align === 'center' ? 'text-center' : ''}`}
+            className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] ${
+              col.align === 'center' ? 'text-center' : ''
+            }`}
           >
             {col.label}
           </div>
         ))}
-        <div /> {/* 삭제 버튼 열 자리 확보 */}
+        <div /> {/* 삭제 버튼 열 자리 */}
       </div>
 
       {/* Rows */}
@@ -220,16 +257,14 @@ function TableInput({
           className="border-b last:border-b-0 border-[#e2e4ea] hover:bg-[#fafbff]"
           style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
         >
-          {field.columns.map((col, i) => (
-            <div
-              key={col.key}
-              className={i < field.columns.length - 1 ? 'border-r border-[#e2e4ea]' : ''}
-            >
+          {field.columns.map((col) => (
+            <div key={col.key} className="py-0.5 px-0.5">
               <TableCell
                 col={col}
                 value={row[col.key] ?? ''}
                 onChange={v => updateCell(rowIdx, col.key, v)}
                 locked={locked}
+                dynamicOptions={col.type === 'subject-select' ? dynamicSubjects : undefined}
               />
             </div>
           ))}
@@ -252,7 +287,7 @@ function TableInput({
       {!locked && (
         <button
           onClick={addRow}
-          className="flex w-full items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-[#5044e3] hover:bg-[#f4f2ff] transition-colors border-t border-[#e2e4ea]"
+          className="flex w-full items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-teal-600 hover:bg-teal-50 transition-colors border-t border-[#e2e4ea]"
         >
           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

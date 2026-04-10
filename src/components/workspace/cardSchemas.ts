@@ -1,12 +1,13 @@
 // ─── 카드 필드 타입 시스템 ────────────────────────────────────────────
 
-export type ColumnType = 'text' | 'textarea' | 'select' | 'date';
+export type ColumnType = 'text' | 'textarea' | 'select' | 'date' | 'subject-select';
 
 export interface TableColumn {
   key: string;
   label: string;
   type: ColumnType;
   options?: string[];
+  subjectSource?: 'ideas' | 'standards'; // for subject-select type
   align?: 'left' | 'center';
   flex?: number; // CSS flex-grow weight, default 1
 }
@@ -112,13 +113,12 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   'A-2-1': {
     fields: [
       tb('core_ideas', '핵심 아이디어', [
-        { key: 'subject',   label: '교과',        type: 'text',     flex: 1 },
-        { key: 'core_idea', label: '핵심 아이디어', type: 'textarea', flex: 4 },
+        { key: 'subject',   label: '교과',        type: 'subject-select', subjectSource: 'ideas', flex: 1 },
+        { key: 'core_idea', label: '핵심 아이디어', type: 'textarea',       flex: 4 },
       ], 2),
       tb('achievement_standards', '성취기준', [
-        { key: 'subject',   label: '교과',            type: 'text',     flex: 1 },
-        { key: 'code',      label: '코드',            type: 'text',     flex: 1.5 },
-        { key: 'statement', label: '성취기준 내용 (원문)', type: 'textarea', flex: 4 },
+        { key: 'subject',  label: '교과',   type: 'subject-select', subjectSource: 'standards', flex: 1 },
+        { key: 'standard', label: '성취기준', type: 'textarea',       flex: 5 },
       ], 2),
     ],
   },
@@ -140,18 +140,18 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
         { key: 'timing', label: '시점',     type: 'text',   flex: 1.5 },
       ], 3),
       tb('rubric', '평가 기준 (루브릭)', [
-        { key: 'axis',    label: '평가 축', type: 'text',     flex: 1.5 },
-        { key: 'level_4', label: '상 (4)',  type: 'textarea', flex: 2 },
-        { key: 'level_3', label: '중 (3)',  type: 'textarea', flex: 2 },
-        { key: 'level_2', label: '하 (2)',  type: 'textarea', flex: 2 },
+        { key: 'axis',      label: '평가 축', type: 'text',     flex: 1.5 },
+        { key: 'level_high', label: '상',     type: 'textarea', flex: 2 },
+        { key: 'level_mid',  label: '중',     type: 'textarea', flex: 2 },
+        { key: 'level_low',  label: '하',     type: 'textarea', flex: 2 },
       ], 2),
     ],
   },
   'Ds-1-2': {
     fields: [
-      tb('problem_situations', '문제 상황', [
-        { key: 'situation', label: '학교 안의 문제 상황', type: 'textarea', flex: 4 },
-        { key: 'decision',  label: '채택 여부',         type: 'select',   flex: 2,
+      tb('problem_situations', undefined, [
+        { key: 'situation', label: '문제 상황',  type: 'textarea', flex: 4 },
+        { key: 'decision',  label: '채택 여부', type: 'select',   flex: 2,
           options: ['채택','보조 자료로 활용','보류','미채택'] },
       ], 3),
       ta('selection_rationale', '채택 결정 근거'),
