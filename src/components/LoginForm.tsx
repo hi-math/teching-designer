@@ -63,20 +63,17 @@ export default function LoginForm() {
           style={{ boxShadow: "0 4px 48px rgba(80,68,227,0.10), 0 1px 8px rgba(0,0,0,0.06)" }}
         >
 
-          {/* ── 왼쪽: 앱 미리보기 플레이스홀더 ── */}
+          {/* ── 왼쪽: 메인 이미지 ── */}
           <div
-            className="relative hidden w-[55%] overflow-hidden lg:flex lg:flex-col"
+            className="relative hidden w-[55%] overflow-hidden lg:block"
             style={{ backgroundColor: "#eef0fb" }}
           >
-            {/* 상단 인디고 바 */}
-            <div
-              className="h-11 w-full shrink-0"
-              style={{ background: "linear-gradient(to right, #5044e3, #44c4b8)" }}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/main.png"
+              alt="Minerva 미리보기"
+              className="h-full w-full object-cover object-center"
             />
-            {/* 빈 영역 — 이미지 추가 예정 */}
-            <div className="flex flex-1 items-center justify-center">
-              <p className="text-[13px]" style={{ color: "#aab0c8" }}>미리보기 이미지</p>
-            </div>
           </div>
 
           {/* ── 오른쪽: 로그인 폼 ── */}
