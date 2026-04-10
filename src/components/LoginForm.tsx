@@ -70,7 +70,7 @@ export default function LoginForm() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/main.png"
+              src="/main1.png"
               alt="Minerva 미리보기"
               className="h-full w-full object-cover object-center"
             />
