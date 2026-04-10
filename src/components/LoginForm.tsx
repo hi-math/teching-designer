@@ -65,14 +65,19 @@ export default function LoginForm() {
 
           {/* ── 왼쪽: 메인 이미지 ── */}
           <div
-            className="relative hidden w-[55%] overflow-hidden lg:block"
+            className="relative hidden w-[55%] overflow-hidden lg:flex lg:flex-col"
             style={{ backgroundColor: "#eef0fb" }}
           >
+            {/* 상단 인디고 바 */}
+            <div
+              className="h-11 w-full shrink-0"
+              style={{ background: "linear-gradient(to right, #5044e3, #44c4b8)" }}
+            />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/main1.png"
+              src="/main.png"
               alt="Minerva 미리보기"
-              className="h-[70%] w-[70%] object-contain object-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              className="h-full w-full object-cover object-center"
             />
           </div>
 
