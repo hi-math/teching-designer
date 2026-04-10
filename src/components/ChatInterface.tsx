@@ -69,30 +69,30 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
   const isInitialLoad = useRef(true);
 
-  // stage별 메시지 캐시 — 이미 로드한 stage는 DB 재요청 없이 즉시 복원
-  const msgCache = useRef<Map<string, { messages: Message[]; timestamps: string[] }>>(new Map());
+  // 통합 메시지 캐시 (lessonId 단위, 단계 무관)
+  const msgCacheRef = useRef<{ messages: Message[]; timestamps: string[] } | null>(null);
 
-  // userId를 ref로 유지 — stage 의존성에서 제외해 불필요한 재로드 방지
+  // userId를 ref로 유지 — 의존성에서 제외해 불필요한 재로드 방지
   const userIdRef = useRef(userId);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
   // 히스토리 로드 세션 카운터 — sendMessage 호출 시 증가해 stale 로드를 취소
   const loadGenRef = useRef(0);
 
-  // 단계 전환 시 캐시 우선, 없으면 DB 로드
+  // lessonId 변경 시 전체 히스토리 한 번만 로드 (stage 무관)
   useEffect(() => {
     if (!lessonId) {
       setMessages([]);
       setTimestamps([]);
+      msgCacheRef.current = null;
       return;
     }
     isInitialLoad.current = true;
 
-    // 캐시 히트 → 즉시 복원, DB 요청 없음
-    const cached = msgCache.current.get(stage);
-    if (cached) {
-      setMessages(cached.messages);
-      setTimestamps(cached.timestamps);
+    // 캐시 히트 → 즉시 복원
+    if (msgCacheRef.current) {
+      setMessages(msgCacheRef.current.messages);
+      setTimestamps(msgCacheRef.current.timestamps);
       return;
     }
 
@@ -114,7 +114,6 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           .select('role, content, created_at')
           .eq('lesson_id', lessonId)
           .eq('user_id', uid)
-          .eq('context_activity_code', stage)
           .order('created_at', { ascending: true });
         if (!data || loadGenRef.current !== myGen) return;
         const msgs = data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
@@ -124,7 +123,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           const m = String(d.getMinutes()).padStart(2, '0');
           return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
         });
-        msgCache.current.set(stage, { messages: msgs, timestamps: tss });
+        msgCacheRef.current = { messages: msgs, timestamps: tss };
         setMessages(msgs);
         setTimestamps(tss);
       } finally {
@@ -134,7 +133,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     load();
   // userId는 ref로 처리하므로 의존성에서 제외
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, lessonId]);
+  }, [lessonId]);
 
   useEffect(() => {
     // messages가 빈 상태(DB 로드 전)에서 초기 플래그를 소비하지 않도록 스킵
@@ -227,7 +226,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
       // 스트리밍 완료 후 캐시 업데이트
       setMessages((prev) => {
-        msgCache.current.set(stage, { messages: prev, timestamps: [...newTimestamps, nowTimestamp()] });
+        msgCacheRef.current = { messages: prev, timestamps: [...newTimestamps, nowTimestamp()] };
         return prev;
       });
 

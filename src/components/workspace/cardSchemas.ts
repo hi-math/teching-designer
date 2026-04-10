@@ -31,6 +31,7 @@ export interface TableFieldDef extends BaseField {
   type: 'table';
   columns: TableColumn[];
   minRows?: number;
+  noAddRow?: boolean;
 }
 
 export type FieldDef = SimpleField | BulletsFieldDef | TableFieldDef;
@@ -112,10 +113,10 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
   'A-2-1': {
     fields: [
-      tb('core_ideas', '핵심 아이디어', [
+      { ...tb('core_ideas', '핵심 아이디어', [
         { key: 'subject',   label: '교과',        type: 'subject-select', subjectSource: 'ideas', flex: 1 },
         { key: 'core_idea', label: '핵심 아이디어', type: 'textarea',       flex: 4 },
-      ], 2),
+      ], 2), noAddRow: true },
       tb('achievement_standards', '성취기준', [
         { key: 'subject',  label: '교과',   type: 'subject-select', subjectSource: 'standards', flex: 1 },
         { key: 'standard', label: '성취기준', type: 'textarea',       flex: 5 },

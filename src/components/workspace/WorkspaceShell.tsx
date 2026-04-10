@@ -634,10 +634,11 @@ function PermissionsModal({
   const toggle = (key: keyof Permissions) => onChange({ ...permissions, [key]: !permissions[key] });
 
   const items: { key: keyof Permissions; label: string; desc: string }[] = [
-    { key: "phaseNav", label: "단계 이동", desc: "참여자가 단계를 이동할 수 있습니다." },
-    { key: "complete", label: "완료", desc: "참여자가 완료 버튼을 누를 수 있습니다." },
-    { key: "skip", label: "건너뛰기", desc: "참여자가 건너뛰기 버튼을 누를 수 있습니다." },
-    { key: "titleEdit", label: "제목 수정", desc: "참여자가 프로젝트 제목을 수정할 수 있습니다." },
+    { key: "phaseNav",  label: "단계 이동",  desc: "참여자가 단계를 이동할 수 있습니다." },
+    { key: "complete",  label: "완료",       desc: "참여자가 완료 버튼을 누를 수 있습니다." },
+    { key: "skip",      label: "건너뛰기",   desc: "참여자가 건너뛰기 버튼을 누를 수 있습니다." },
+    { key: "opinion",   label: "의견묻기",   desc: "참여자가 의견묻기 버튼을 누를 수 있습니다." },
+    { key: "titleEdit", label: "제목 수정",  desc: "참여자가 프로젝트 제목을 수정할 수 있습니다." },
   ];
 
   return (
@@ -799,7 +800,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [isHost, setIsHost] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<Permissions>({
-    phaseNav: false, complete: true, skip: true, opinion: true, titleEdit: false,
+    phaseNav: false, complete: false, skip: false, opinion: false, titleEdit: false,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workspaceChannelRef = useRef<any>(null);
@@ -2294,12 +2295,16 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                           setSelectedActivityCode(act.code);
                           setRightTab("ai");
                         }}
-                        className={`mb-6 rounded-2xl p-6 border transition-all cursor-pointer ${
+                        className={`relative mb-6 rounded-2xl p-6 border transition-all cursor-pointer overflow-hidden ${
                           st === "completed" ? "bg-[#eff8ff] border-[#bae0ff]"
                           : st === "skipped"  ? "bg-[#f5f6f8] border-[#e2e4ea]"
                           : "bg-white border-transparent"
-                        } ${selectedActivityCode === act.code ? "shadow-[0_4px_24px_rgba(80,68,227,0.12)]" : ""}`}
+                        }`}
                       >
+                        {/* 활성화 인디케이터 — 왼쪽 세로 바 */}
+                        {selectedActivityCode === act.code && (
+                          <span className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl bg-[#5044e3]" />
+                        )}
                         {/* 헤더: 코드 + 토글 버튼 */}
                         <div className="mb-2 flex items-center justify-between">
                           <p className={`text-[13px] font-bold tracking-widest uppercase ${locked ? "text-[#adb2ba]" : "text-[#5044e3]"}`}>
