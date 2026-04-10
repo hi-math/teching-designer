@@ -1444,19 +1444,19 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     setProfileModalOpen(true);
   };
 
-  // ── 프로젝트 온보딩 (첫 방문 시 AI 안내) ───────────────────────
+  // ── 프로젝트 온보딩 (첫 방문 + AI 준비 완료 후 안내) ─────────
   useEffect(() => {
-    if (!lessonId) return;
+    if (!lessonId || !aiReady) return;
     const key = `minerva_onboarded_${lessonId}`;
     if (localStorage.getItem(key)) return;
     localStorage.setItem(key, '1');
+    setRightTab('ai');
     const t = setTimeout(() => {
-      setRightTab('ai');
       setChatTrigger(`안녕하세요! 수업 설계 프로젝트를 시작하신 것을 환영합니다. Minerva의 간단한 사용법과 첫 번째 단계(팀 준비)에서 무엇을 해야 하는지 안내해 주세요.`);
-    }, 1200);
+    }, 400);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lessonId]);
+  }, [lessonId, aiReady]);
 
 
   // projectTitle을 ref에 동기화 (beforeunload 클로저용)

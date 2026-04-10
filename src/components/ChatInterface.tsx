@@ -76,6 +76,9 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   const userIdRef = useRef(userId);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
+  // 히스토리 로드 세션 카운터 — sendMessage 호출 시 증가해 stale 로드를 취소
+  const loadGenRef = useRef(0);
+
   // 단계 전환 시 캐시 우선, 없으면 DB 로드
   useEffect(() => {
     if (!lessonId) {
@@ -93,6 +96,9 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       return;
     }
 
+    loadGenRef.current += 1;
+    const myGen = loadGenRef.current;
+
     setMessages([]);
     setTimestamps([]);
     setIsLoadingHistory(true);
@@ -102,7 +108,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           if (data.user) { authUidRef.current = data.user.id; userIdRef.current = data.user.id; }
           return data.user?.id ?? null;
         }));
-        if (!uid) return;
+        if (!uid || loadGenRef.current !== myGen) return;
         const { data } = await createClient()
           .from('ai_messages')
           .select('role, content, created_at')
@@ -110,7 +116,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           .eq('user_id', uid)
           .eq('context_activity_code', stage)
           .order('created_at', { ascending: true });
-        if (!data) return;
+        if (!data || loadGenRef.current !== myGen) return;
         const msgs = data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
         const tss = data.map((r) => {
           const d = new Date(r.created_at);
@@ -122,7 +128,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
         setMessages(msgs);
         setTimestamps(tss);
       } finally {
-        setIsLoadingHistory(false);
+        if (loadGenRef.current === myGen) setIsLoadingHistory(false);
       }
     };
     load();
@@ -143,6 +149,9 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isStreaming) return;
+    // 히스토리 로드 중에 메시지를 보내면 stale 로드가 메시지를 덮어쓰지 않도록 세션 무효화
+    loadGenRef.current += 1;
+    setIsLoadingHistory(false);
 
     const userMsg: Message = { role: 'user', content: text.trim() };
     const newMessages = [...messages, userMsg];
@@ -253,14 +262,14 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
   // keep ref up-to-date so triggerMessage effect always calls latest sendMessage
   sendMessageRef.current = sendMessage;
 
-  // auto-send when triggerMessage changes
+  // auto-send when triggerMessage changes — wait until history loading is done
   useEffect(() => {
-    if (!triggerMessage || triggerMessage === lastTriggerRef.current) return;
+    if (!triggerMessage || triggerMessage === lastTriggerRef.current || isLoadingHistory) return;
     lastTriggerRef.current = triggerMessage;
     const t = setTimeout(() => sendMessageRef.current(triggerMessage), 120);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerMessage]);
+  }, [triggerMessage, isLoadingHistory]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
