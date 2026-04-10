@@ -89,8 +89,6 @@ const PHASE_SECTIONS: Record<string, PhaseSection[]> = {
       code: "DI-1", label: "개발 및 프로토타이핑", tabLabel: "수업 자료 개발",
       activities: [
         { code: "DI-1-1", label: "개발 자료 목록", description: "팀의 학습활동 설계안 및 개별 교사의 설계안에 근거하여 교과별 개발할 자료 목록을 나열하고 팀원들의 논의를 통해 조정한다." },
-        { code: "DI-AI", label: "AI 자료 프로토타이핑", description: "산출물을 확인하고, HUMAN IN THE LOOP를 경험해 보자." },
-        { code: "DI-SIM", label: "수업 시뮬레이션", description: "시뮬레이션을 바탕으로 수업을 더 개선해 보자." },
       ],
     },
     {

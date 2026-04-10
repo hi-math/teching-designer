@@ -111,7 +111,7 @@ function TableCell({
   locked: boolean;
 }) {
   const base =
-    `w-full bg-transparent px-2.5 py-2 text-[13px] text-[#2d3339] placeholder-[#c8cdd4] outline-none focus:bg-[#f8f9ff] disabled:opacity-50 ${
+    `w-full bg-transparent px-2.5 py-2 text-[13px] text-[#2d3339] outline-none focus:bg-[#f8f9ff] disabled:opacity-50 ${
       col.align === 'center' ? 'text-center' : ''
     }`;
 
@@ -145,7 +145,6 @@ function TableCell({
         value={value}
         onChange={onChange}
         disabled={locked}
-        placeholder={col.label}
         className={base}
       />
     );
@@ -156,7 +155,6 @@ function TableCell({
       value={value}
       onChange={e => onChange(e.target.value)}
       disabled={locked}
-      placeholder={col.label}
       className={base}
     />
   );
@@ -191,32 +189,41 @@ function TableInput({
     onChange(rows.filter((_, i) => i !== idx));
   };
 
+  // CSS grid: 열 너비를 헤더·데이터 행이 공유 → 구분선 완벽 일치
+  const gridTemplate =
+    field.columns.map(c => `${c.flex ?? 1}fr`).join(' ') + ' 28px';
+
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e2e4ea]" onClick={e => e.stopPropagation()}>
       {/* Header */}
-      <div className="flex bg-[#f1f4f9] border-b border-[#e2e4ea]">
-        {field.columns.map(col => (
+      <div
+        className="bg-[#f1f4f9] border-b border-[#e2e4ea]"
+        style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
+      >
+        {field.columns.map((col, i) => (
           <div
             key={col.key}
-            style={{ flex: col.flex ?? 1 }}
-            className={`shrink-0 min-w-0 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] border-r last:border-r-0 border-[#e2e4ea] ${
-              col.align === 'center' ? 'text-center' : ''
-            }`}
+            className={`px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#757b82] ${
+              i < field.columns.length - 1 ? 'border-r border-[#e2e4ea]' : ''
+            } ${col.align === 'center' ? 'text-center' : ''}`}
           >
             {col.label}
           </div>
         ))}
-        <div className="w-7 shrink-0" />
+        <div /> {/* 삭제 버튼 열 자리 확보 */}
       </div>
 
       {/* Rows */}
       {rows.map((row, rowIdx) => (
-        <div key={rowIdx} className="flex border-b last:border-b-0 border-[#e2e4ea] hover:bg-[#fafbff]">
-          {field.columns.map(col => (
+        <div
+          key={rowIdx}
+          className="border-b last:border-b-0 border-[#e2e4ea] hover:bg-[#fafbff]"
+          style={{ display: 'grid', gridTemplateColumns: gridTemplate }}
+        >
+          {field.columns.map((col, i) => (
             <div
               key={col.key}
-              style={{ flex: col.flex ?? 1 }}
-              className="shrink-0 min-w-0 border-r last:border-r-0 border-[#e2e4ea]"
+              className={i < field.columns.length - 1 ? 'border-r border-[#e2e4ea]' : ''}
             >
               <TableCell
                 col={col}
@@ -226,7 +233,7 @@ function TableInput({
               />
             </div>
           ))}
-          <div className="w-7 shrink-0 flex items-center justify-center">
+          <div className="flex items-center justify-center">
             {!locked && rows.length > 1 && (
               <button
                 onClick={() => deleteRow(rowIdx)}
