@@ -72,7 +72,7 @@ export default function LoginForm() {
             <img
               src="/main1.png"
               alt="Minerva 미리보기"
-              className="h-full w-full object-cover object-center"
+              className="h-[70%] w-[70%] object-contain object-center absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
             />
           </div>
 
