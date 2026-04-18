@@ -50,7 +50,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
 
   // 마운트 시: auth UID 캐시 + API 연결 확인
   useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
+    createClient().auth.getUser().then(({ data }: { data: { user: { id: string } | null } }) => {
       if (data.user) authUidRef.current = data.user.id;
     });
     fetch('/api/chat')
