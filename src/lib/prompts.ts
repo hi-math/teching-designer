@@ -344,6 +344,7 @@ export interface PageContext {
   selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
   opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
   teamMembers?: { name: string; subject: string }[]; // R6: 팀 프로필
+  allStandards?: { code: string; subject: string; domain: string; content: string }[]; // R8: 전체 성취기준 DB
 }
 
 // R5 요약: 선택 카드 제외 선행 카드를 카드당 200자로 잘라 반환
@@ -463,6 +464,19 @@ export function buildPageContextBlock(ctx: PageContext): string {
         lines.push(`**[${f.name}]**`);
         lines.push(body);
       }
+    }
+  }
+
+  // ── R8: 전체 성취기준 DB (A-2-1 전용) ──────────────────────────
+  if (ctx.allStandards && ctx.allStandards.length > 0) {
+    lines.push('');
+    lines.push('### 전체 성취기준 목록 (R8) — 2022 개정 교육과정 중학교');
+    lines.push('아래 성취기준 전체를 분석 및 추천의 참고 데이터로 활용하세요.');
+    lines.push('형식: [코드] (교과 · 영역) 내용');
+    lines.push('');
+    for (const s of ctx.allStandards) {
+      const domain = s.domain ? ` · ${s.domain}` : '';
+      lines.push(`${s.code} (${s.subject}${domain}) ${s.content.replace(/\n/g, ' ')}`);
     }
   }
 
