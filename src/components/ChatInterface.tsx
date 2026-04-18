@@ -104,7 +104,7 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     setIsLoadingHistory(true);
     const load = async () => {
       try {
-        const uid = userIdRef.current || authUidRef.current || (await createClient().auth.getUser().then(({ data }) => {
+        const uid = userIdRef.current || authUidRef.current || (await createClient().auth.getUser().then(({ data }: { data: { user: { id: string } | null } }) => {
           if (data.user) { authUidRef.current = data.user.id; userIdRef.current = data.user.id; }
           return data.user?.id ?? null;
         }));
