@@ -1068,7 +1068,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       });
       presenceChannel
         .on("presence", { event: "sync" }, () => {
-          const state = presenceChannel!.presenceState<{ userId: string }>();
+          const state = presenceChannel!.presenceState() as Record<string, { userId: string }[]>;
           const ids: string[] = [];
           Object.values(state).forEach((arr) => arr.forEach((u) => ids.push(u.userId)));
           setOnlineUserIds(ids);

@@ -116,8 +116,9 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
           .eq('user_id', uid)
           .order('created_at', { ascending: true });
         if (!data || loadGenRef.current !== myGen) return;
-        const msgs = data.map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
-        const tss = data.map((r) => {
+        type MsgRow = { role: string; content: string; created_at: string };
+        const msgs = (data as MsgRow[]).map((r) => ({ role: r.role as 'user' | 'assistant', content: r.content }));
+        const tss = (data as MsgRow[]).map((r) => {
           const d = new Date(r.created_at);
           const h = d.getHours();
           const m = String(d.getMinutes()).padStart(2, '0');
