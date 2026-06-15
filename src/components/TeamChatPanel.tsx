@@ -53,6 +53,50 @@ function avatarColor(userId: string) {
   return AVATAR_COLORS[n % AVATAR_COLORS.length];
 }
 
+// ─── Google Docs 헬퍼 ──────────────────────────────────────────────
+
+function loadGIS(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).google?.accounts) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('GIS 스크립트 로드 실패'));
+    document.head.appendChild(s);
+  });
+}
+
+function getGoogleToken(clientId: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      callback: (res: any) => resolve(res.error ? null : res.access_token as string),
+    });
+    tokenClient.requestAccessToken();
+  });
+}
+
+function buildChatText(messages: ChatMessage[]): string {
+  const lines = [
+    '팀 채팅 기록',
+    `날짜: ${new Date().toLocaleDateString('ko-KR')}`,
+    '─'.repeat(40),
+    '',
+  ];
+  for (const msg of messages) {
+    if (msg.replyTo) lines.push(`  ↳ ${msg.replyTo.senderName}: ${msg.replyTo.content}`);
+    lines.push(`[${msg.timestamp}] ${msg.senderName}`);
+    lines.push(msg.content);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
 // ─── 컴포넌트 ──────────────────────────────────────────────────────
 
 interface Props {
@@ -68,11 +112,18 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [mgmtOpen, setMgmtOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [gdocLoading, setGdocLoading] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const mgmtRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef('');
 
   // ── 프로필 캐시 ──────────────────────────────────────────────
   const profileCache = useRef<Record<string, { name: string; avatarUrl: string | null }>>({});
@@ -256,6 +307,117 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, [reactionPickerFor]);
 
+  // ── 채팅 관리 드롭다운 외부 클릭 닫기 ───────────────────────
+  useEffect(() => {
+    if (!mgmtOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (mgmtRef.current && !mgmtRef.current.contains(e.target as Node)) {
+        setMgmtOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [mgmtOpen]);
+
+  // ── 텍스트 파일 다운로드 ─────────────────────────────────────
+  const downloadAsText = () => {
+    setMgmtOpen(false);
+    if (messages.length === 0) { alert('채팅 내용이 없습니다.'); return; }
+    const content = buildChatText(messages);
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `팀채팅_${new Date().toLocaleDateString('ko-KR').replace(/\.\s*/g, '-').replace(/-$/, '')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // ── 구글 문서 생성 ───────────────────────────────────────────
+  const createGoogleDoc = useCallback(async () => {
+    setMgmtOpen(false);
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert('Google Docs 연동을 사용하려면 관리자가 NEXT_PUBLIC_GOOGLE_CLIENT_ID 환경 변수를 설정해야 합니다.');
+      return;
+    }
+    if (messages.length === 0) { alert('채팅 내용이 없습니다.'); return; }
+    setGdocLoading(true);
+    try {
+      await loadGIS();
+      const token = await getGoogleToken(clientId);
+      if (!token) { setGdocLoading(false); return; }
+
+      const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `팀 채팅 기록 - ${new Date().toLocaleDateString('ko-KR')}` }),
+      });
+      const doc = await createRes.json() as { documentId?: string };
+      if (!doc.documentId) throw new Error('문서 ID를 받지 못했습니다');
+
+      const chatText = buildChatText(messages);
+      await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [{ insertText: { location: { index: 1 }, text: chatText } }] }),
+      });
+
+      window.open(`https://docs.google.com/document/d/${doc.documentId}/edit`, '_blank');
+    } catch (e) {
+      console.error('Google Docs 생성 오류:', e);
+      alert('구글 문서 생성에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      setGdocLoading(false);
+    }
+  }, [messages]);
+
+  // ── 음성 입력 토글 ───────────────────────────────────────────
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SpeechRecognitionAPI = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      alert('이 브라우저는 음성 인식을 지원하지 않습니다.\n크롬(Chrome) 브라우저를 사용해 주세요.');
+      return;
+    }
+    finalTranscriptRef.current = input;
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setInput(finalTranscriptRef.current + interim);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (e: any) => {
+      if (e.error !== 'aborted') console.error('STT 오류:', e.error);
+      setIsRecording(false);
+    };
+    recognition.onend = () => setIsRecording(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+  }, [isRecording, input]);
+
   // ── 답장 대상 메시지로 스크롤 ────────────────────────────────
   const scrollToMessage = useCallback((msgId: string) => {
     const el = document.getElementById(`msg-${msgId}`);
@@ -269,6 +431,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
+    if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); }
     setSending(true);
 
     const now = new Date().toISOString();
@@ -289,6 +452,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     };
     setMessages((prev) => [...prev, optimistic]);
     setInput('');
+    finalTranscriptRef.current = '';
     setReplyTo(null);
 
     const { data, error } = await createClient()
@@ -372,6 +536,54 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   return (
     <div className="flex flex-col h-full bg-white">
 
+      {/* ── 채팅 관리 헤더 ── */}
+      <div className="shrink-0 flex items-center justify-end px-3 py-2 border-b border-[#adb2ba]/20">
+        <div className="relative" ref={mgmtRef}>
+          <button
+            onClick={() => setMgmtOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium text-[#5a6066] bg-[#f1f4f9] hover:bg-[#e5e9f0] transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            채팅 관리
+            <svg className={`h-3 w-3 transition-transform ${mgmtOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {mgmtOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg">
+              <button
+                onClick={downloadAsText}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-[14px] text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="h-4 w-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                텍스트 파일 다운로드
+              </button>
+              <button
+                onClick={createGoogleDoc}
+                disabled={gdocLoading}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-[14px] text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {gdocLoading ? (
+                  <svg className="h-4 w-4 text-blue-500 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4 text-blue-500 shrink-0" viewBox="0 0 48 48" fill="currentColor">
+                    <path d="M28 4H12C9.8 4 8 5.8 8 8v32c0 2.2 1.8 4 4 4h24c2.2 0 4-1.8 4-4V20L28 4zm-2 18V7l11 11H26z" />
+                  </svg>
+                )}
+                구글 문서 만들기
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* 메시지 목록 */}
       <div
@@ -597,28 +809,50 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
 
       {/* 입력창 */}
       <div className="bg-white px-4 pt-2 pb-5" style={{ borderTop: "1px solid rgba(173,178,186,0.2)" }}>
-        <div className="relative flex items-center">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="메시지를 입력하세요..."
-            rows={1}
-            className="w-full resize-none rounded-full bg-[#f1f4f9] pl-5 pr-12 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none border-none min-h-[48px] focus:ring-2 focus:ring-[#5044e3]/20"
-          />
-          {input.trim() && (
-            <button
-              onClick={sendMessage}
-              disabled={sending}
-              className="absolute right-2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#4335d6] text-white transition hover:opacity-90 disabled:opacity-50"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          {/* 마이크 버튼 */}
+          <button
+            onClick={toggleRecording}
+            title={isRecording ? '녹음 중지' : '음성 입력 (한국어)'}
+            className={`shrink-0 flex h-10 w-10 items-center justify-center rounded-full transition-all ${
+              isRecording
+                ? 'bg-red-100 text-red-500 shadow-md shadow-red-100 animate-pulse'
+                : 'bg-[#f1f4f9] text-[#5a6066] hover:bg-[#e5e9f0] hover:text-[#5044e3]'
+            }`}
+          >
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 1a4 4 0 00-4 4v7a4 4 0 008 0V5a4 4 0 00-4-4z" />
+              <path d="M19 10v2a7 7 0 01-14 0v-2H3v2a9 9 0 008 8.94V23h2v-2.06A9 9 0 0021 12v-2h-2z" />
+            </svg>
+          </button>
+          <div className="relative flex-1">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); finalTranscriptRef.current = e.target.value; }}
+              onKeyDown={handleKeyDown}
+              placeholder={isRecording ? '🎙️ 음성 인식 중...' : '메시지를 입력하세요...'}
+              rows={1}
+              className="w-full resize-none rounded-full bg-[#f1f4f9] pl-5 pr-12 py-3 text-[15px] text-[#2d3339] placeholder-[#adb2ba] outline-none border-none min-h-[48px] focus:ring-2 focus:ring-[#5044e3]/20"
+            />
+            {input.trim() && (
+              <button
+                onClick={sendMessage}
+                disabled={sending}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#5044e3] to-[#4335d6] text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
+        {isRecording && (
+          <p className="mt-1.5 text-center text-[12px] text-red-400 animate-pulse">
+            🎙️ 음성 인식 중 — 한국어로 말씀하세요. 버튼을 다시 누르면 중지됩니다.
+          </p>
+        )}
       </div>
     </div>
   );
