@@ -831,16 +831,21 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   // ── 유저 프로필 로드 ─────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       const meta = data.user.user_metadata ?? {};
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name, school, subject, avatar_url")
+        .eq("id", data.user.id)
+        .single();
       setUserProfile({
         id: data.user.id,
         email: data.user.email ?? "",
-        display_name: meta.display_name ?? meta.full_name ?? meta.name ?? null,
-        school: meta.school ?? null,
-        subject: meta.subject ?? null,
-        avatar_url: meta.avatar_url ?? null,
+        display_name: profile?.display_name ?? meta.display_name ?? meta.full_name ?? meta.name ?? null,
+        school: profile?.school ?? meta.school ?? null,
+        subject: profile?.subject ?? meta.subject ?? null,
+        avatar_url: profile?.avatar_url ?? meta.avatar_url ?? null,
       });
     });
   }, []);
@@ -2459,8 +2464,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                       }
                                     </button>
                                     <button
-                                      onClick={() => {
-                                        createClient().from("activity_contents").update(
+                                      onClick={async () => {
+                                        await createClient().from("activity_contents").update(
                                           { content: { type: "opinion", question: opinionData.question, active: false } }
                                         ).eq("lesson_id", lessonId).eq("activity_code", `${opinionKey}__opinion`);
                                         opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
