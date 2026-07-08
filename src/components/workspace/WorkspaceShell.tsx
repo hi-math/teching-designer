@@ -35,80 +35,78 @@ type PhaseSection = { code: string; label: string; tabLabel: string; activities:
 const PHASE_SECTIONS: Record<string, PhaseSection[]> = {
   T: [
     {
-      code: "T-1", label: "비전 설정", tabLabel: "팀 비전 및 설계 방향 설정",
+      code: "T-a", label: "비전 설정", tabLabel: "팀 비전 및 설계 방향 설정",
       activities: [
-        { code: "T-1-1", label: "비전 설정", description: "협력적 수업설계를 통해 실현하고자 하는 교육적인 목적에 대해 자유롭게 논의하고 공통의 비전을 설정한다." },
-        { code: "T-1-2", label: "수업설계 방향 수립", description: "팀원들이 협력적 수업설계의 목적을 달성하기 위해 지향해야 할 수업설계의 방향을 설정한다." },
+        { code: "T-1", label: "비전 설정", description: "팀원들이 협력적 수업설계를 통해 실현하고자 하는 궁극적인 교육목적에 대해 자유롭게 논의하고 공통의 비전을 설정한다." },
+        { code: "T-2", label: "수업설계 방향 수립", description: "팀원들이 협력적 수업설계의 목적을 달성하기 위해 지향해야 할 수업설계의 방향을 설정한다." },
       ],
     },
     {
-      code: "T-2", label: "역할 분담", tabLabel: "팀 운영 구조 수립",
+      code: "T-b", label: "역할 분담", tabLabel: "팀 운영 구조 수립",
       activities: [
-        { code: "T-2-1", label: "역할 분담", description: "협력적 수업설계에 필요한 역할을 나열하고, 팀원들의 특성과 희망을 고려하여 역할을 배분한다." },
-        { code: "T-2-2", label: "팀 규칙", description: "팀의 협력적 수업 설계를 위한 팀 규칙에 대해 논의하고, 팀원들의 상황을 고려하여 결정한다." },
-        { code: "T-2-3", label: "팀 일정", description: "팀의 협력적 수업설계를 위한 팀 일정에 대해 논의하고, 팀원들의 상황을 고려하여 결정한다." },
-        { code: "학습자 분석", label: "학습자 분석", description: "학습자의 특성을 분석한다." },
+        { code: "T-3", label: "역할 분담", description: "협력적 수업설계에 필요한 역할을 나열하고, 팀원들의 특성과 희망을 고려하여 역할을 배분한다." },
+        { code: "T-4", label: "팀 규칙", description: "팀의 협력적 수업설계를 위한 팀 규칙에 대해 논의하고, 팀원들의 상황을 고려하여 결정한다." },
+        { code: "T-5", label: "팀 일정", description: "팀의 협력적 수업설계를 위한 팀 일정에 대해 논의하고, 팀원들의 상황을 고려하여 결정한다." },
       ],
     },
   ],
   A: [
     {
-      code: "A-1", label: "주제 선정", tabLabel: "수업 주제 선정",
+      code: "A-a", label: "주제 선정", tabLabel: "수업 주제 선정",
       activities: [
-        { code: "A-1-1", label: "주제 선정 기준", description: "팀원들이 주제선정기준에 대해 논의하고 조정한다." },
-        { code: "A-1-2", label: "주제 선정", description: "팀원들이 협력적 수업 설계할 주제를 나열한다." },
+        { code: "A-1", label: "주제 선정 기준", description: "팀원들은 주제 선정 기준에 대해 논의하고 조정한다." },
+        { code: "A-2", label: "주제 선정", description: "팀원들은 함께 설계할 주제들을 나열하고 선정한다." },
       ],
     },
     {
-      code: "A-2", label: "핵심 아이디어 분석", tabLabel: "학습 내용 분석 및 목표 진술",
+      code: "A-b", label: "핵심 아이디어 분석", tabLabel: "학습 내용 분석 및 목표 진술",
       activities: [
-        { code: "A-2-1", label: "성취 기준 분석", description: "팀원들은 선정된 주제와 관련하여 학습자들이 학습해야 할 내용과 기능요소를 나열하고, 팀 자원에서 핵심적으로 반영할 내용과 기능을 조정한다." },
-        { code: "A-2-2", label: "통합된 수업 목표", description: "팀원들은 내용요소, 기능요소 등을 결합하여 통합된 수업목표를 진술한다." },
+        { code: "A-3", label: "성취 기준 분석", description: "팀원들은 선정된 주제와 관련된 교과별 성취기준을 분석하고, 핵심적으로 반영할 요소를 통합하며 재구조화한다." },
+        { code: "A-4", label: "통합된 수업 목표", description: "팀원들은 재구조화한 성취기준을 결합하여 통합된 수업목표로 진술하고, 필요에 따라 평가의 준거가 될 성취수준으로 구체화한다." },
       ],
     },
   ],
   Ds: [
     {
-      code: "Ds-1", label: "평가 및 문제 설계", tabLabel: "평가·문제·학습활동 설계",
+      code: "Ds-a", label: "평가 및 문제 설계", tabLabel: "평가·문제·학습활동 설계",
       activities: [
-        { code: "Ds-1-1", label: "평가 계획", description: "수업목표에 적합한 평가 아이디어에 대해 논의하고, 최종결과와 활동과정상의 평가내용 및 방법을 조정한다." },
-        { code: "Ds-1-2", label: "문제 상황", description: "팀원들은 문제상황에 대한 아이디어를 나열하고, 팀원들의 논의를 통해 조정한다." },
-        { code: "Ds-1-3", label: "학습 활동 설계", description: "팀원들은 학습자들이 수행해야 할 학습활동을 나열하고, 팀원들의 논의를 통해 조정한다." },
+        { code: "Ds-1", label: "평가 계획", description: "수업목표에 적합한 평가 아이디어에 대해 논의하고, 최종 결과와 활동 과정 상의 평가 내용 및 방법을 조정한다." },
+        { code: "Ds-2", label: "문제 상황", description: "팀원들은 문제 상황에 대한 아이디어를 나열하고, 팀원들의 논의를 통해 조정한다." },
+        { code: "Ds-3", label: "학습 활동 설계", description: "팀원들은 학습자들이 수행해야 할 학습활동을 나열하고, 팀원들의 논의를 통해 조정한다." },
       ],
     },
     {
-      code: "Ds-2", label: "지원 도구 설계", tabLabel: "학습 지원 환경 설계",
+      code: "Ds-b", label: "지원 도구 설계", tabLabel: "학습 지원 환경 설계",
       activities: [
-        { code: "Ds-2-1", label: "지원 도구 설계", description: "학습활동을 지원하는 도구들을 각각의 활동과 연결하고, 공동의 논의를 통해 조정한다." },
-        { code: "Ds-2-2", label: "스캐폴딩 설계", description: "각 활동에서 학습자들에게 필요한 스캐폴딩을 나열하고, 공동의 논의를 통해 조정한다." },
+        { code: "Ds-4", label: "지원 도구 설계", description: "학습활동을 지원하는 도구들을 각각의 활동과 연결하고, 공동의 논의를 통해 조정한다." },
       ],
     },
   ],
   DI: [
     {
-      code: "DI-1", label: "개발 및 프로토타이핑", tabLabel: "수업 자료 개발",
+      code: "DI-a", label: "개발 및 프로토타이핑", tabLabel: "수업 자료 개발",
       activities: [
-        { code: "DI-1-1", label: "개발 자료 목록", description: "팀의 학습활동 설계안 및 개별 교사의 설계안에 근거하여 교과별 개발할 자료 목록을 나열하고 팀원들의 논의를 통해 조정한다." },
+        { code: "DI-1", label: "개발 자료 목록", description: "팀의 학습활동 설계안 및 개별 교사의 설계안에 근거하여 교과별 개발할 자료 목록을 나열하고, 팀원들의 논의를 통해 조정한다." },
       ],
     },
     {
-      code: "DI-2", label: "수업 기록", tabLabel: "수업 실행 및 기록",
+      code: "DI-b", label: "수업 기록", tabLabel: "수업 실행 및 기록",
       activities: [
-        { code: "DI-2-1", label: "수업 기록", description: "각 수업을 실행하고 수업의 주요 상황 또는 에피소드를 기록한다." },
+        { code: "DI-2", label: "수업 기록", description: "팀원들은 수업을 실행하고, 수업의 주요 상황이나 에피소드를 기록한다." },
       ],
     },
   ],
   E: [
     {
-      code: "E-1", label: "수업 성찰", tabLabel: "수업 성찰 및 개선",
+      code: "E-a", label: "수업 성찰", tabLabel: "수업 성찰 및 개선",
       activities: [
-        { code: "E-1-1", label: "수업 성찰", description: "수업실행과정에서 집한 학습(평가) 자료에 근거하여 성찰 및 평가한 내용을 공유하고, 설계안 수립을 공동으로 개선한다." },
+        { code: "E-1", label: "수업 성찰", description: "수업 실행에서 수집한 학습(평가) 자료에 근거하여 성찰·평가한 내용을 공유하고, 설계한 수업을 공동으로 개선한다." },
       ],
     },
     {
-      code: "E-2", label: "수업설계 과정 성찰", tabLabel: "협력적 설계 과정 평가",
+      code: "E-b", label: "수업설계 과정 성찰", tabLabel: "협력적 설계 과정 평가",
       activities: [
-        { code: "E-2-1", label: "수업설계 과정 성찰", description: "각 단계별 협력적 수업설계 목표에 근거하여 활동 결과를 성찰하고 평가한다." },
+        { code: "E-2", label: "수업설계 과정 성찰", description: "각 단계별 협력적 수업설계 목표에 근거하여 활동 결과를 성찰하고 평가한다." },
       ],
     },
   ],
@@ -742,7 +740,7 @@ function WorkNavButton({
 
 export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [activePhase, setActivePhase] = useState("T");
-  const [activeSection, setActiveSection] = useState("T-1");
+  const [activeSection, setActiveSection] = useState("T-a");
   const [projectTitle, setProjectTitle] = useState("");
   const [targetGrade, setTargetGrade] = useState("");
   const [relatedSubjects, setRelatedSubjects] = useState("");
@@ -780,10 +778,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [editingOpinions, setEditingOpinions] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const opinionChannelRef = useRef<any>(null);
-  const [roleRows, setRoleRows] = useState<{ name: string; role: string }[]>([
-    { name: "", role: "" }, { name: "", role: "" },
-    { name: "", role: "" }, { name: "", role: "" },
-  ]);
   // ── 버전 관리 ────────────────────────────────────────────────
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
 
@@ -823,8 +817,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const activityInputsRef = useRef<Record<string, string>>({});
   const selectedStandardsRef = useRef<StandardItem[]>([]);
   const selectedIdeasRef = useRef<IdeaItem[]>([]);
-  const opinionsRef = useRef<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
-  const opinionResponsesRef = useRef<Record<string, Record<string, string>>>({});
   const structuredInputsRef = useRef<Record<string, Record<string, unknown>>>({});
   const userProfileRef = useRef<UserProfile | null>(null);
 
@@ -912,13 +904,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           }
           if (c.type === "structured" && c.fields) {
             loadedStructured[code] = c.fields as Record<string, unknown>;
-          } else if (c.type === "role_table" && code === "T-2-1" && c.rows) {
-            // 레거시 T-2-1 → structured 포맷으로 마이그레이션
-            loadedStructured["T-2-1"] = {
-              roles: (c.rows as { name: string; role: string }[]).map(r => ({
-                name: r.name ?? "", subject: "", core_role: r.role ?? "", area: "",
-              })),
-            };
           } else if (c.type === "text" && c.text !== undefined) {
             inputs[code] = c.text;
           }
@@ -1292,15 +1277,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     if (selectedIdeasRef.current.length > 0) {
       contents["__selected_ideas"] = { type: "ideas", items: selectedIdeasRef.current };
     }
-    // 의견묻기 질문 + 응답 포함
-    for (const [opinionKey, o] of Object.entries(opinionsRef.current)) {
-      contents[`${opinionKey}__opinion`] = { type: "opinion", question: o.question, active: !o.hidden };
-    }
-    for (const [opinionKey, resMap] of Object.entries(opinionResponsesRef.current)) {
-      for (const [uid, response] of Object.entries(resMap)) {
-        contents[`${opinionKey}__opinion_res_${uid}`] = { type: "opinion_response", response };
-      }
-    }
+    // 의견묻기(질문/응답)는 실시간 협업 데이터이므로 버전 스냅샷 대상에서 제외한다.
+    // 스냅샷에 담으면 삭제 후 예전 버전을 복원할 때 삭제한 의견이 되살아난다.
 
     const supabase = createClient();
     await supabase.from("lesson_snapshots").insert({
@@ -1384,16 +1362,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     );
   }, [lessonId, activityInputs]);
 
-  // ── 역할 분담 변경 ───────────────────────────────────────────
-  const handleRoleRowChange = useCallback((index: number, field: "name" | "role", value: string) => {
-    setTitleSaveStatus("idle");
-    setRoleRows((prev) => {
-      const next = prev.map((r, j) => j === index ? { ...r, [field]: value } : r);
-      pendingContent.current["T-2-1"] = { type: "role_table", rows: next };
-      scheduleSave("T-2-1", { type: "role_table", rows: next });
-      return next;
-    });
-  }, [scheduleSave]);
 
 
   // ── 단계 변경 (DB 저장 + Broadcast) ────────────────────────────
@@ -1470,8 +1438,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   // 버전 생성 클로저용 ref 동기화
   useEffect(() => { activityInputsRef.current = activityInputs; }, [activityInputs]);
   useEffect(() => { structuredInputsRef.current = structuredInputs; }, [structuredInputs]);
-  useEffect(() => { opinionsRef.current = opinions; }, [opinions]);
-  useEffect(() => { opinionResponsesRef.current = opinionResponses; }, [opinionResponses]);
   useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
 
   // 세션 종료 시 미저장 내용 flush + 버전 생성 (keepalive fetch로 보장)
@@ -1593,6 +1559,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const supabase = createClient();
             await Promise.all(
               Object.entries(contents)
+                // 의견묻기 행은 복원 대상에서 제외 — 삭제한 의견이 되살아나지 않도록
+                .filter(([code]) => !code.includes("__opinion"))
                 .map(([code, content]) =>
                   supabase.from("activity_contents").upsert(
                     { lesson_id: lessonId, activity_code: code, content },
@@ -1602,8 +1570,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             );
             const inputs: Record<string, string> = {};
             const statusMap: Record<string, "active" | "completed" | "skipped"> = {};
-            const restoredOpinions: Record<string, { question: string; hidden: boolean; actCode: string }> = {};
-            const restoredOpinionResponses: Record<string, Record<string, string>> = {};
             const restoredStructured: Record<string, Record<string, unknown>> = {};
             for (const [code, c] of Object.entries(contents)) {
               if (code === "__selected_standards" && Array.isArray(c.items)) {
@@ -1618,23 +1584,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 selectedIdeasRef.current = items;
                 continue;
               }
-              if (code.endsWith("__opinion")) {
-                if (c.active !== false && c.question) {
-                  const opinionKey = code.slice(0, -"__opinion".length);
-                  const m = opinionKey.match(/^(.+)__(\d+)$/);
-                  const actCodeFromKey = m ? m[1] : opinionKey;
-                  restoredOpinions[opinionKey] = { question: c.question as string, hidden: false, actCode: actCodeFromKey };
-                }
-                continue;
-              }
-              const resIdx = code.indexOf("__opinion_res_");
-              if (resIdx !== -1) {
-                const opinionKey = code.slice(0, resIdx);
-                const uid = code.slice(resIdx + "__opinion_res_".length);
-                if (!restoredOpinionResponses[opinionKey]) restoredOpinionResponses[opinionKey] = {};
-                restoredOpinionResponses[opinionKey][uid] = (c.response as string) ?? "";
-                continue;
-              }
+              // 의견묻기 행은 복원하지 않음 — 실시간 협업 데이터라 현재 상태를 유지한다
+              if (code.includes("__opinion")) continue;
               if (c.type === "structured" && c.fields) {
                 restoredStructured[code] = c.fields;
                 continue;
@@ -1645,8 +1596,6 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             setActivityInputs(inputs);
             setActivityStatus(statusMap);
             activityStatusRef.current = statusMap;
-            if (Object.keys(restoredOpinions).length > 0) { setOpinions(restoredOpinions); opinionsRef.current = restoredOpinions; }
-            if (Object.keys(restoredOpinionResponses).length > 0) { setOpinionResponses(restoredOpinionResponses); opinionResponsesRef.current = restoredOpinionResponses; }
             if (Object.keys(restoredStructured).length > 0) { setStructuredInputs(restoredStructured); structuredInputsRef.current = restoredStructured; }
             setActiveModal(null);
           }}
@@ -1701,7 +1650,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const rows = items.length > 0
               ? items.map(item => ({ subject: item.subject, core_idea: item.content }))
               : [{ subject: '', core_idea: '' }, { subject: '', core_idea: '' }];
-            handleStructuredChange('A-2-1', { ...(structuredInputs['A-2-1'] ?? {}), core_ideas: rows });
+            handleStructuredChange('A-3', { ...(structuredInputs['A-3'] ?? {}), core_ideas: rows });
             createClient().from("activity_contents").upsert(
               { lesson_id: lessonId, activity_code: "__selected_ideas", content: { type: "ideas", items }, updated_by: userProfile?.id ?? null },
               { onConflict: "lesson_id,activity_code" }
@@ -1719,7 +1668,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
             const rows = items.length > 0
               ? items.map(item => ({ subject: item.subject, standard: `[${item.code}] ${item.content}` }))
               : [{ subject: '', standard: '' }, { subject: '', standard: '' }];
-            handleStructuredChange('A-2-1', { ...(structuredInputs['A-2-1'] ?? {}), achievement_standards: rows });
+            handleStructuredChange('A-3', { ...(structuredInputs['A-3'] ?? {}), achievement_standards: rows });
             createClient().from("activity_contents").upsert(
               { lesson_id: lessonId, activity_code: "__selected_standards", content: { type: "standards", items }, updated_by: userProfile?.id ?? null },
               { onConflict: "lesson_id,activity_code" }
@@ -2383,8 +2332,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                           <p className="text-[15px] leading-relaxed text-[#5a6066]">{act.description}</p>
                         </div>
 
-                        {/* A-2-1 검색 버튼 */}
-                        {act.code === 'A-2-1' && !locked && (
+                        {/* A-3 검색 버튼 */}
+                        {act.code === 'A-3' && !locked && (
                           <div className="mb-3 flex gap-2" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={(e) => { e.stopPropagation(); setActiveModal("핵심아이디어검색"); }}
@@ -2465,9 +2414,13 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                                     </button>
                                     <button
                                       onClick={async () => {
-                                        await createClient().from("activity_contents").update(
-                                          { content: { type: "opinion", question: opinionData.question, active: false } }
-                                        ).eq("lesson_id", lessonId).eq("activity_code", `${opinionKey}__opinion`);
+                                        // 질문 행 + 모든 응답 행(__opinion, __opinion_res_*)을 DB에서 완전 삭제
+                                        const { error } = await createClient()
+                                          .from("activity_contents")
+                                          .delete()
+                                          .eq("lesson_id", lessonId)
+                                          .like("activity_code", `${opinionKey}__opinion%`);
+                                        if (error) { console.error("[opinion] 삭제 실패:", error.message); return; }
                                         opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
                                         setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
                                         setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });

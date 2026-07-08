@@ -76,7 +76,7 @@ export interface TextContent {
   text: string;
 }
 
-/** 역할 분담 표 (T-2-1) */
+/** 역할 분담 표 (T-3, 레거시) */
 export interface RoleTableContent {
   type: "role_table";
   rows: { name: string; role: string }[];

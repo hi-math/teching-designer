@@ -60,11 +60,8 @@ type CardContent = {
   problem_situations?: Array<{ situation: string; decision: string }>;
   activities?: Array<{ period: string; activity: string; linked_standards: string[] }>;
   support_tools?: Array<{ stage: string; tool: string; purpose: string; related_period: string }>;
-  scaffolding?: Array<{ activity: string; plan: string }>;
   dev_materials?: Array<{ member: string; material: string; content: string; reviewer: string }>;
-  review_considerations?: string[];
   exec_schedule?: Array<{ period: string; date: string; time: string; place: string; teacher: string }>;
-  outputs?: Array<{ period: string; output_desc: string }>;
   design_rubric?: Array<{ area: string; question: string; score: string }>;
   reflection_note?: string;
 };
@@ -314,9 +311,9 @@ function renderCover(d: RenderData): string {
 // ─── 목차 + 수업 개요 + 팀 구성 ───────────────────────────────────
 function renderTocOverview(d: RenderData): string {
   try {
-    const A12 = d.contents["A-1-2"];
-    const A21 = d.contents["A-2-1"];
-    const A22 = d.contents["A-2-2"];
+    const A12 = d.contents["A-2"];
+    const A21 = d.contents["A-3"];
+    const A22 = d.contents["A-4"];
 
     // 관련 성취기준: 카드 구조화 필드 → 전역 __selected_standards 순
     const stdList = hasField(A21, "achievement_standards")
@@ -346,8 +343,8 @@ function renderTocOverview(d: RenderData): string {
       d.numStudents ? `총 ${d.numStudents}명` : "",
     ].filter(Boolean).join(" ");
 
-    // 팀 구성: T-2-1 roles 우선
-    const T21 = d.contents["T-2-1"];
+    // 팀 구성: T-3 roles 우선
+    const T21 = d.contents["T-3"];
     const teamRows: string[][] = hasField(T21, "roles")
       ? (T21!.roles ?? []).map((r) => [r.name, r.subject, r.core_role])
       : (T21?.rows ?? []).map((r) => [r.name, r.role ?? "", ""])
@@ -404,8 +401,8 @@ function renderChapterT(d: RenderData): string {
     const c = d.contents;
 
     // 1.1 공동 비전
-    const T11 = c["T-1-1"];
-    let s11 = sub("1.1 팀 공동 비전 (T-1-1)");
+    const T11 = c["T-1"];
+    let s11 = sub("1.1 팀 공동 비전 (T-1)");
     if (hasField(T11, "vision", "vision_note")) {
       if (T11!.vision) s11 += emphasisBox("공동 비전", T11!.vision);
       if (T11!.vision_note) s11 += `<p>${nl2br(T11!.vision_note)}</p>`;
@@ -414,8 +411,8 @@ function renderChapterT(d: RenderData): string {
     }
 
     // 1.2 수업설계 방향
-    const T12 = c["T-1-2"];
-    let s12 = sub("1.2 수업설계 방향 (T-1-2)");
+    const T12 = c["T-2"];
+    let s12 = sub("1.2 수업설계 방향 (T-2)");
     if (hasField(T12, "directions")) {
       s12 += bullets(T12!.directions ?? []);
     } else {
@@ -423,8 +420,8 @@ function renderChapterT(d: RenderData): string {
     }
 
     // 1.3 역할 배분 — roles[] 우선, rows[] 호환
-    const T21 = c["T-2-1"];
-    let s13 = sub("1.3 역할 배분 (T-2-1)");
+    const T21 = c["T-3"];
+    let s13 = sub("1.3 역할 배분 (T-3)");
     if (hasField(T21, "roles")) {
       s13 += table(
         ["이름", "과목", "핵심 역할", "담당 영역"],
@@ -442,8 +439,8 @@ function renderChapterT(d: RenderData): string {
     }
 
     // 1.4 팀 규칙 — 불릿만 (표 금지)
-    const T22 = c["T-2-2"];
-    let s14 = sub("1.4 팀 규칙 (T-2-2)");
+    const T22 = c["T-4"];
+    let s14 = sub("1.4 팀 규칙 (T-4)");
     if (hasField(T22, "rules")) {
       s14 += bullets(T22!.rules ?? []);
     } else {
@@ -451,8 +448,8 @@ function renderChapterT(d: RenderData): string {
     }
 
     // 1.5 단계별 일정 — 목표 완료일 / 내용 / 산출물
-    const T23 = c["T-2-3"];
-    let s15 = sub("1.5 단계별 일정 (T-2-3)");
+    const T23 = c["T-5"];
+    let s15 = sub("1.5 단계별 일정 (T-5)");
     if (hasField(T23, "schedule")) {
       s15 += table(
         ["목표 완료일", "내용", "산출물"],
@@ -479,9 +476,9 @@ function renderChapterA(d: RenderData): string {
     const c = d.contents;
 
     // 2.1 주제 선정
-    const A11 = c["A-1-1"];
-    const A12 = c["A-1-2"];
-    let s21 = sub("2.1 주제 선정 (A-1-1, A-1-2)");
+    const A11 = c["A-1"];
+    const A12 = c["A-2"];
+    let s21 = sub("2.1 주제 선정 (A-1, A-2)");
     if (hasField(A11, "criteria") || hasField(A12, "candidates", "final_topic")) {
       if (hasField(A11, "criteria")) {
         s21 += `<p>세 교과 공통의 주제 선정 기준은 다음과 같다.</p>`;
@@ -502,11 +499,11 @@ function renderChapterA(d: RenderData): string {
     }
 
     // 2.2 교과별 핵심 아이디어
-    const A21 = c["A-2-1"];
+    const A21 = c["A-3"];
     const coreList = hasField(A21, "core_ideas")
       ? (A21!.core_ideas ?? [])
       : d.ideas.map((i) => ({ subject: i.subject, core_idea: i.content }));
-    let s22 = sub("2.2 교과별 핵심 아이디어 (A-2-1)");
+    let s22 = sub("2.2 교과별 핵심 아이디어 (A-3)");
     if (coreList.length > 0) {
       const textPart = `<div class="text">${coreList
         .map((i) => `<p><strong>${esc(i.subject)}</strong><br>${nl2br(i.core_idea)}</p>`)
@@ -522,7 +519,7 @@ function renderChapterA(d: RenderData): string {
     const stdList = hasField(A21, "achievement_standards")
       ? (A21!.achievement_standards ?? [])
       : d.standards.map((s) => ({ subject: s.subject, code: s.code, statement: s.content }));
-    let s23 = sub("2.3 성취기준 분석 (A-2-1)");
+    let s23 = sub("2.3 성취기준 분석 (A-3)");
     if (stdList.length > 0) {
       s23 += table(
         ["교과", "성취기준"],
@@ -539,8 +536,8 @@ function renderChapterA(d: RenderData): string {
     }
 
     // 2.4 통합 수업 목표
-    const A22 = c["A-2-2"];
-    let s24 = sub("2.4 핵심 아이디어·성취기준·수업설계의 연계 (A-2-2)");
+    const A22 = c["A-4"];
+    let s24 = sub("2.4 핵심 아이디어·성취기준·수업설계의 연계 (A-4)");
     if (hasField(A22, "integration_narrative", "integrated_goal")) {
       if (A22!.integration_narrative) {
         s24 += `<p>${nl2br(A22!.integration_narrative)}</p>`;
@@ -569,8 +566,8 @@ function renderChapterDs(d: RenderData): string {
     const c = d.contents;
 
     // 3.1 평가 내용 및 방법
-    const Ds11 = c["Ds-1-1"];
-    let s31 = sub("3.1 평가 내용 및 방법 (Ds-1-1)");
+    const Ds11 = c["Ds-1"];
+    let s31 = sub("3.1 평가 내용 및 방법 (Ds-1)");
     if (hasField(Ds11, "eval_questions", "eval_methods", "rubric")) {
       s31 += `<p>백워드 디자인(Backward Design) 원리에 따라 학습 목표에서 출발하여 평가 주제와 방법, 기준을 먼저 설계하였다.</p>`;
       if (hasField(Ds11, "eval_questions")) {
@@ -598,8 +595,8 @@ function renderChapterDs(d: RenderData): string {
     }
 
     // 3.2 문제 상황 — 2열(상황/채택 여부), 번호 열 없음
-    const Ds12 = c["Ds-1-2"];
-    let s32 = sub("3.2 문제 상황 아이디어 (Ds-1-2)");
+    const Ds12 = c["Ds-2"];
+    let s32 = sub("3.2 문제 상황 아이디어 (Ds-2)");
     if (hasField(Ds12, "problem_situations")) {
       s32 += `<p>학교 안의 실제 상황에서 출발하는 문제 상황 아이디어를 수집하고 팀 논의를 통해 최종 채택 여부를 결정하였다.</p>`;
       s32 += table(
@@ -615,8 +612,8 @@ function renderChapterDs(d: RenderData): string {
     }
 
     // 3.3 학습자 활동 — 차시 가운데
-    const Ds13 = c["Ds-1-3"];
-    let s33 = sub("3.3 학습자 활동 아이디어 (Ds-1-3)");
+    const Ds13 = c["Ds-3"];
+    let s33 = sub("3.3 학습자 활동 아이디어 (Ds-3)");
     if (hasField(Ds13, "activities")) {
       s33 += table(
         ["차시", "학습 활동", "연계 성취기준"],
@@ -632,8 +629,8 @@ function renderChapterDs(d: RenderData): string {
     }
 
     // 3.4 지원 도구 — 관련 차시 열 필수
-    const Ds21 = c["Ds-2-1"];
-    let s34 = sub("3.4 지원 도구 (Ds-2-1)");
+    const Ds21 = c["Ds-4"];
+    let s34 = sub("3.4 지원 도구 (Ds-4)");
     if (hasField(Ds21, "support_tools")) {
       s34 += table(
         ["활동 단계", "도구", "목적", "관련 차시"],
@@ -644,22 +641,9 @@ function renderChapterDs(d: RenderData): string {
       s34 += textFallback(Ds21);
     }
 
-    // 3.5 스캐폴딩
-    const Ds22 = c["Ds-2-2"];
-    let s35 = sub("3.5 스캐폴딩 방안 (Ds-2-2)");
-    if (hasField(Ds22, "scaffolding")) {
-      s35 += table(
-        ["활동", "스캐폴딩 방안"],
-        (Ds22!.scaffolding ?? []).map((r) => [r.activity, r.plan]),
-        { colWidthsMm: [55, 115] }
-      );
-    } else {
-      s35 += textFallback(Ds22);
-    }
-
     return `<section class="chapter" data-num="3">
   <div class="chapter-header">3. 설계 (Ds)</div>
-  ${s31}<div class="page-break"></div>${s32}${s33}${s34}${s35}
+  ${s31}<div class="page-break"></div>${s32}${s33}${s34}
 </section>`;
   } catch (e) {
     console.error("[pdf/Ds]", e);
@@ -673,8 +657,8 @@ function renderChapterDI(d: RenderData): string {
     const c = d.contents;
 
     // 4.1 개발 자료
-    const DI11 = c["DI-1-1"];
-    let s41 = sub("4.1 개발 자료 목록 (DI-1-1)");
+    const DI11 = c["DI-1"];
+    let s41 = sub("4.1 개발 자료 목록 (DI-1)");
     if (hasField(DI11, "dev_materials")) {
       s41 += table(
         ["팀원", "자료명", "내용 요약", "검토자"],
@@ -685,20 +669,11 @@ function renderChapterDI(d: RenderData): string {
       s41 += textFallback(DI11);
     }
 
-    // 4.2 검토 유의점
-    const DI12 = c["DI-1-2"];
-    let s42 = sub("4.2 검토의 유의점 및 고려 사항 (DI-1-2)");
-    if (hasField(DI12, "review_considerations")) {
-      s42 += bullets(DI12!.review_considerations ?? []);
-    } else {
-      s42 += textFallback(DI12);
-    }
-
-    // 4.3 수업 실행 일정 — 5개 열 모두 가운데
-    const DI21 = c["DI-2-1"];
-    let s43 = sub("4.3 수업 실행 일정 (DI-2-1)");
+    // 4.2 수업 기록 및 실행 일정 — 5개 열 모두 가운데
+    const DI21 = c["DI-2"];
+    let s42 = sub("4.2 수업 기록 및 실행 일정 (DI-2)");
     if (hasField(DI21, "exec_schedule")) {
-      s43 += table(
+      s42 += table(
         ["차시", "날짜", "시간", "장소", "담당 교사"],
         (DI21!.exec_schedule ?? []).map((r) => [
           r.period,
@@ -710,25 +685,12 @@ function renderChapterDI(d: RenderData): string {
         { colWidthsMm: [15, 22, 18, 65, 50], centerCols: [0, 1, 2, 3, 4] }
       );
     } else {
-      s43 += textFallback(DI21);
-    }
-
-    // 4.4 수업별 수행 결과
-    const DI22 = c["DI-2-2"];
-    let s44 = sub("4.4 수업별 수행 결과 확인 자료 (DI-2-2)");
-    if (hasField(DI22, "outputs")) {
-      s44 += table(
-        ["차시", "수행 결과 확인 자료"],
-        (DI22!.outputs ?? []).map((r) => [r.period, r.output_desc]),
-        { colWidthsMm: [15, 155], centerCols: [0] }
-      );
-    } else {
-      s44 += textFallback(DI22);
+      s42 += textFallback(DI21);
     }
 
     return `<section class="chapter" data-num="4">
   <div class="chapter-header">4. 개발·실행 (DI)</div>
-  ${s41}${s42}${s43}${s44}
+  ${s41}${s42}
 </section>`;
   } catch (e) {
     console.error("[pdf/DI]", e);
@@ -740,10 +702,10 @@ function renderChapterDI(d: RenderData): string {
 function renderChapterE(d: RenderData): string {
   try {
     const c = d.contents;
-    // E-2-1: 수업설계 과정 성찰 (design_rubric)
-    // E-1-1: 수업 성찰 (reflection_note)
-    const E21 = c["E-2-1"];
-    const E11 = c["E-1-1"];
+    // E-2: 수업설계 과정 성찰 (design_rubric)
+    // E-1: 수업 성찰 (reflection_note)
+    const E21 = c["E-2"];
+    const E11 = c["E-1"];
 
     const designRubric = E21?.design_rubric ?? E11?.design_rubric ?? [];
     const reflectionNote = E21?.reflection_note || E11?.reflection_note || E21?.text || E11?.text || "";
@@ -901,13 +863,6 @@ export async function GET(req: Request) {
       if ((c as Record<string, unknown>).type === "structured" && (c as Record<string, unknown>).fields) {
         const fields = (c as Record<string, unknown>).fields as CardContent;
         contents[code] = { ...fields, status: c.status };
-      } else if ((c as Record<string, unknown>).type === "role_table" && code === "T-2-1" && (c as Record<string, unknown>).rows) {
-        // 레거시 T-2-1 포맷
-        const rows = (c as Record<string, unknown>).rows as { name: string; role: string }[];
-        contents[code] = {
-          status: c.status,
-          roles: rows.map((r) => ({ name: r.name ?? "", subject: "", core_role: r.role ?? "", area: "" })),
-        } as CardContent;
       } else {
         contents[code] = c;
       }

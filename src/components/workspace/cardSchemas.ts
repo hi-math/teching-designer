@@ -62,18 +62,18 @@ const tb = (key: string, label: string | undefined, columns: TableColumn[], minR
 export const CARD_SCHEMAS: Record<string, CardSchema> = {
 
   // ── 1단계: 팀 준비 ──────────────────────────────────────────────
-  'T-1-1': {
+  'T-1': {
     fields: [
       rt('vision', '팀 공동 비전'),
       ta('vision_note', '배경 및 맥락 (선택)', '비전의 배경과 맥락을 설명하세요…'),
     ],
   },
-  'T-1-2': {
+  'T-2': {
     fields: [
       bl('directions'),
     ],
   },
-  'T-2-1': {
+  'T-3': {
     fields: [
       tb('roles', undefined, [
         { key: 'name',      label: '이름',      type: 'text', flex: 1 },
@@ -83,12 +83,12 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 3),
     ],
   },
-  'T-2-2': {
+  'T-4': {
     fields: [
       bl('rules'),
     ],
   },
-  'T-2-3': {
+  'T-5': {
     fields: [
       tb('schedule', undefined, [
         { key: 'due_date',    label: '목표 완료일', type: 'date', flex: 1.5, align: 'center' },
@@ -99,19 +99,19 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
 
   // ── 2단계: 분석 ─────────────────────────────────────────────────
-  'A-1-1': {
+  'A-1': {
     fields: [
       bl('criteria'),
     ],
   },
-  'A-1-2': {
+  'A-2': {
     fields: [
       bl('candidates', '후보 주제'),
       rt('final_topic', '최종 선정 주제'),
       ta('selection_rationale', '선정 사유'),
     ],
   },
-  'A-2-1': {
+  'A-3': {
     fields: [
       { ...tb('core_ideas', '핵심 아이디어', [
         { key: 'subject',   label: '교과',        type: 'subject-select', subjectSource: 'ideas', flex: 1 },
@@ -123,7 +123,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 2),
     ],
   },
-  'A-2-2': {
+  'A-4': {
     fields: [
       ta('integration_narrative', '연계 설명', '핵심 아이디어 ↔ 성취기준 ↔ 협력적 수업설계의 연계를 설명하세요…'),
       rt('integrated_goal', '통합 수업 목표'),
@@ -131,7 +131,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
 
   // ── 3단계: 설계 ─────────────────────────────────────────────────
-  'Ds-1-1': {
+  'Ds-1': {
     fields: [
       bl('eval_questions', '평가 질문', 3),
       tb('eval_methods', '평가 방법', [
@@ -148,7 +148,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 2),
     ],
   },
-  'Ds-1-2': {
+  'Ds-2': {
     fields: [
       tb('problem_situations', undefined, [
         { key: 'situation', label: '문제 상황',  type: 'textarea', flex: 4 },
@@ -158,7 +158,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ta('selection_rationale', '채택 결정 근거'),
     ],
   },
-  'Ds-1-3': {
+  'Ds-3': {
     fields: [
       tb('activities', '학습 활동', [
         { key: 'period',           label: '차시',          type: 'text',     flex: 0.8, align: 'center' },
@@ -167,7 +167,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 3),
     ],
   },
-  'Ds-2-1': {
+  'Ds-4': {
     fields: [
       tb('support_tools', '지원 도구', [
         { key: 'stage',          label: '활동 단계', type: 'text', flex: 1.5 },
@@ -177,17 +177,9 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 3),
     ],
   },
-  'Ds-2-2': {
-    fields: [
-      tb('scaffolding', '스캐폴딩 방안', [
-        { key: 'activity', label: '활동',          type: 'text',     flex: 2 },
-        { key: 'plan',     label: '스캐폴딩 방안', type: 'textarea', flex: 4 },
-      ], 3),
-    ],
-  },
 
   // ── 4단계: 개발·실행 ────────────────────────────────────────────
-  'DI-1-1': {
+  'DI-1': {
     fields: [
       tb('dev_materials', '개발 자료 목록', [
         { key: 'member',   label: '팀원 이름', type: 'text',     flex: 1.2 },
@@ -197,7 +189,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ], 3),
     ],
   },
-  'DI-2-1': {
+  'DI-2': {
     fields: [
       tb('exec_schedule', '수업 실행 일정', [
         { key: 'period',  label: '차시',     type: 'text', flex: 0.8, align: 'center' },
@@ -210,7 +202,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
   },
 
   // ── 5단계: 평가·성찰 ────────────────────────────────────────────
-  'E-1-1': {
+  'E-1': {
     fields: [
       tb('design_rubric', '협력적 수업설계 종합 평가', [
         { key: 'area',     label: '영역',    type: 'select',   flex: 1.5,
@@ -222,7 +214,7 @@ export const CARD_SCHEMAS: Record<string, CardSchema> = {
       ta('reflection_note', '팀 성찰 메모', '개선 과제를 기록하세요…'),
     ],
   },
-  'E-2-1': {
+  'E-2': {
     fields: [
       tb('design_rubric', '협력적 수업설계 종합 평가', [
         { key: 'area',     label: '영역',    type: 'select',   flex: 1.5,

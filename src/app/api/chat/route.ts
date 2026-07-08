@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   const selectedCode = pageContext?.selectedActivityCode as string | undefined;
   const enrichedContext = { ...pageContext };
 
-  if (selectedCode === 'A-2-1') {
+  if (selectedCode === 'A-3') {
     enrichedContext.allStandards = loadAllStandards();
   }
 
