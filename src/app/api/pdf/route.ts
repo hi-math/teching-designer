@@ -79,6 +79,7 @@ type RenderData = {
   ideas: { subject: string; domain: string; content: string }[];
   opinions: { question: string; responses: { name: string; response: string }[] }[];
   generatedAt: string;
+  writtenDate: string | null; // 수업 기본정보의 작성일(created_date), 없으면 생성일로 대체
 };
 
 // ─── 유틸 ─────────────────────────────────────────────────────────
@@ -299,7 +300,7 @@ function renderCover(d: RenderData): string {
     <tr><th>교과(융합)</th><td>${esc(subjects)}</td></tr>
     <tr><th>총 차시</th><td>${d.totalSessions ? `${d.totalSessions}차시` : "(미입력)"}</td></tr>
     <tr><th>설계 방식</th><td>T·A·Ds·DI·E 5단계 협력적 수업설계</td></tr>
-    <tr><th>작성일</th><td>${esc(fmtDate(d.generatedAt))}</td></tr>
+    <tr><th>작성일</th><td>${esc(fmtDate(d.writtenDate || d.generatedAt))}</td></tr>
   </table>
 </section>`;
   } catch (e) {
@@ -799,7 +800,7 @@ export async function GET(req: Request) {
     // 1) 레슨 기본 정보
     const { data: lesson, error: lessonErr } = await supabase
       .from("lessons")
-      .select("title, target_grade, related_subjects, num_classes, num_students, total_sessions")
+      .select("title, target_grade, related_subjects, num_classes, num_students, total_sessions, created_date")
       .eq("id", lessonId)
       .single();
     if (lessonErr || !lesson) return Response.json({ error: "lesson not found" }, { status: 404 });
@@ -904,6 +905,7 @@ export async function GET(req: Request) {
       ideas,
       opinions,
       generatedAt,
+      writtenDate: lesson.created_date ?? null,
     };
     const html = buildHtml(renderData);
 

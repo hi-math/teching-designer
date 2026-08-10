@@ -124,6 +124,8 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef('');
+  // 사용자가 의도적으로 중지했는지 여부 (무음 자동 종료와 구분)
+  const wantRecordingRef = useRef(false);
 
   // ── 프로필 캐시 ──────────────────────────────────────────────
   const profileCache = useRef<Record<string, { name: string; avatarUrl: string | null }>>({});
@@ -377,6 +379,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   // ── 음성 입력 토글 ───────────────────────────────────────────
   const toggleRecording = useCallback(() => {
     if (isRecording) {
+      wantRecordingRef.current = false;
       recognitionRef.current?.stop();
       setIsRecording(false);
       return;
@@ -386,6 +389,10 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     const SpeechRecognitionAPI = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
       alert('이 브라우저는 음성 인식을 지원하지 않습니다.\n크롬(Chrome) 브라우저를 사용해 주세요.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      alert('음성 인식은 보안 연결(HTTPS)에서만 사용할 수 있습니다.\nhttps 주소 또는 localhost로 접속해 주세요.');
       return;
     }
     finalTranscriptRef.current = input;
@@ -408,12 +415,36 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onerror = (e: any) => {
-      if (e.error !== 'aborted') console.error('STT 오류:', e.error);
+      if (e.error === 'aborted') return;
+      console.error('STT 오류:', e.error);
+
+      // no-speech는 무음일 때 흔히 발생 — onend에서 자동 재시작하므로 무시
+      if (e.error === 'no-speech') return;
+
+      const messages: Record<string, string> = {
+        'not-allowed': '마이크 권한이 차단되어 있습니다.\n주소창 왼쪽 자물쇠 아이콘 → 마이크를 "허용"으로 바꾼 뒤 새로고침해 주세요.',
+        'service-not-allowed': '브라우저가 음성 인식 서비스를 차단했습니다.\n크롬 설정에서 마이크 권한을 확인해 주세요.',
+        'audio-capture': '마이크를 찾을 수 없습니다.\n마이크가 연결되어 있는지 확인해 주세요.',
+        'network': '음성 인식 서버에 연결하지 못했습니다.\n네트워크 상태를 확인해 주세요.',
+      };
+      wantRecordingRef.current = false;
       setIsRecording(false);
+      alert(messages[e.error] ?? `음성 인식에 실패했습니다. (${e.error})`);
     };
-    recognition.onend = () => setIsRecording(false);
+
+    // 무음으로 자동 종료되면 사용자가 중지하기 전까지 다시 시작
+    recognition.onend = () => {
+      if (!wantRecordingRef.current) { setIsRecording(false); return; }
+      try {
+        recognition.start();
+      } catch {
+        wantRecordingRef.current = false;
+        setIsRecording(false);
+      }
+    };
 
     recognitionRef.current = recognition;
+    wantRecordingRef.current = true;
     recognition.start();
     setIsRecording(true);
   }, [isRecording, input]);
@@ -431,7 +462,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
-    if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); }
+    if (isRecording) { wantRecordingRef.current = false; recognitionRef.current?.stop(); setIsRecording(false); }
     setSending(true);
 
     const now = new Date().toISOString();
