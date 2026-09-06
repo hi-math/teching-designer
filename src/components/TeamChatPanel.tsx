@@ -104,6 +104,15 @@ interface Props {
   currentUserId: string;
 }
 
+type Profile = { name: string; avatarUrl: string | null };
+
+function toProfile(row?: { display_name?: string | null; email?: string | null; avatar_url?: string | null }): Profile {
+  return {
+    name: row?.display_name ?? row?.email ?? '알 수 없음',
+    avatarUrl: row?.avatar_url ?? null,
+  };
+}
+
 export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -128,21 +137,50 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
   const wantRecordingRef = useRef(false);
 
   // ── 프로필 캐시 ──────────────────────────────────────────────
-  const profileCache = useRef<Record<string, { name: string; avatarUrl: string | null }>>({});
+  const profileCache = useRef<Record<string, Profile>>({});
+  // 같은 사용자에 대한 동시 요청을 합치기 위한 in-flight 맵.
+  // 캐시는 await 이 끝나야 채워지므로, 이게 없으면 Promise.all 로 200건을 동시에
+  // 변환할 때 전부 캐시 미스가 나 profiles 에 200번을 한꺼번에 질의하게 된다.
+  const profileInflight = useRef<Record<string, Promise<Profile>>>({});
 
-  const getProfile = useCallback(async (userId: string) => {
-    if (profileCache.current[userId]) return profileCache.current[userId];
+  /** 여러 사용자를 한 번의 질의로 미리 채운다 (N+1 방지). */
+  const preloadProfiles = useCallback(async (userIds: string[]) => {
+    const missing = [...new Set(userIds)].filter((id) => id && !profileCache.current[id]);
+    if (missing.length === 0) return;
     const { data } = await createClient()
       .from('profiles')
-      .select('display_name, email, avatar_url')
-      .eq('id', userId)
-      .single();
-    const profile = {
-      name: data?.display_name ?? data?.email ?? '알 수 없음',
-      avatarUrl: data?.avatar_url ?? null,
-    };
-    profileCache.current[userId] = profile;
-    return profile;
+      .select('id, display_name, email, avatar_url')
+      .in('id', missing);
+    for (const row of data ?? []) {
+      profileCache.current[row.id as string] = toProfile(row);
+    }
+    // 조회되지 않은 id 도 채워 둬야 이후 단건 조회로 새지 않는다
+    for (const id of missing) {
+      if (!profileCache.current[id]) profileCache.current[id] = toProfile();
+    }
+  }, []);
+
+  const getProfile = useCallback(async (userId: string): Promise<Profile> => {
+    const cached = profileCache.current[userId];
+    if (cached) return cached;
+
+    const pending = profileInflight.current[userId];
+    if (pending) return pending;
+
+    const request = (async () => {
+      const { data } = await createClient()
+        .from('profiles')
+        .select('display_name, email, avatar_url')
+        .eq('id', userId)
+        .single();
+      const profile = toProfile(data ?? undefined);
+      profileCache.current[userId] = profile;
+      delete profileInflight.current[userId];
+      return profile;
+    })();
+
+    profileInflight.current[userId] = request;
+    return request;
   }, []);
 
   // ── DB 메시지 → ChatMessage 변환 ──────────────────────────────
@@ -189,6 +227,9 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
         .order('created_at', { ascending: true })
         .limit(200);
       if (!data) return;
+
+      // 메시지 작성자 + 답글 원본 작성자를 한 번의 질의로 모두 채운 뒤 변환한다
+      await preloadProfiles(data.map((r) => r.user_id));
       const converted = await Promise.all(data.map((row) => toMessage(row, data)));
 
       const ids = converted.map((m) => m.id);
@@ -214,7 +255,7 @@ export default function TeamChatPanel({ lessonId, currentUserId }: Props) {
       setMessages(converted);
     };
     load();
-  }, [lessonId, toMessage, currentUserId]);
+  }, [lessonId, toMessage, currentUserId, preloadProfiles]);
 
   // ── Realtime 구독 ────────────────────────────────────────────
   useEffect(() => {

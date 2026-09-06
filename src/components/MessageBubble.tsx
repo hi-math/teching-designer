@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -13,7 +15,7 @@ interface Props {
   timestamp: string;
 }
 
-export default function MessageBubble({ message, isFirst, isLast, isStreaming, timestamp }: Props) {
+function MessageBubble({ message, isFirst, isLast, isStreaming, timestamp }: Props) {
   const isUser = message.role === 'user';
 
   /* ── 사용자 메시지: 말풍선 ── */
@@ -66,3 +68,7 @@ export default function MessageBubble({ message, isFirst, isLast, isStreaming, t
     </div>
   );
 }
+
+// 스트리밍 중에는 마지막 말풍선만 매 청크 갱신된다.
+// memo 가 없으면 그 사이 앞의 모든 말풍선까지 함께 다시 렌더된다.
+export default memo(MessageBubble);

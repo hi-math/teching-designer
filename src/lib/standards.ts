@@ -137,3 +137,60 @@ export function formatStandardsContext(standards: Standard[]): string {
   lines.push('---');
   return lines.join('\n');
 }
+
+// ─── A-3 카드용 후보 선별 ───────────────────────────────────────────
+//
+// 예전에는 655건 전량을 매 요청 시스템 프롬프트에 실어 보냈다(약 4만 자).
+// 첫 토큰까지 수 초가 더 걸리고 매 턴 같은 비용을 다시 냈다.
+// 여기서는 수업에 걸린 교과로 후보를 좁힌다. 결과가 수업 단위로 고정되므로
+// prompt caching 도 함께 걸 수 있다(교과가 안 잡히면 카드 내용 기반 검색으로 대체).
+
+export interface StandardBrief {
+  code: string;
+  subject: string;
+  domain: string;
+  content: string;
+}
+
+const MAX_CANDIDATES = 220;
+
+function toBrief(s: Standard): StandardBrief {
+  return { code: s.code, subject: s.subject, domain: s.domain, content: s.content };
+}
+
+/**
+ * @param relatedSubjects 수업에 연결된 교과 (쉼표/공백 구분 문자열)
+ * @param fallbackQuery   교과가 비었을 때 사용할 검색어 (카드 입력 등)
+ */
+export function selectStandardCandidates(
+  relatedSubjects?: string,
+  fallbackQuery?: string,
+): StandardBrief[] {
+  const standards = getStandards();
+
+  const subjects = (relatedSubjects ?? '')
+    .split(/[,\s/·]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 1);
+
+  if (subjects.length > 0) {
+    const matched = standards.filter((s) =>
+      subjects.some(
+        (sub) =>
+          s.subject === sub ||
+          s.subject_group === sub ||
+          s.subject.includes(sub) ||
+          s.subject_group.includes(sub),
+      ),
+    );
+    if (matched.length > 0) return matched.slice(0, MAX_CANDIDATES).map(toBrief);
+  }
+
+  // 교과 정보가 없으면 카드 내용으로 검색, 그것도 없으면 앞부분만
+  const query = (fallbackQuery ?? '').trim();
+  if (query) {
+    const hits = searchStandards(query, MAX_CANDIDATES);
+    if (hits.length > 0) return hits.map(toBrief);
+  }
+  return standards.slice(0, MAX_CANDIDATES).map(toBrief);
+}

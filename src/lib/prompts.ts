@@ -331,7 +331,9 @@ export interface PageContext {
   selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
   opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
   teamMembers?: { name: string; subject: string }[]; // R6: 팀 프로필
-  allStandards?: { code: string; subject: string; domain: string; content: string }[]; // R8: 전체 성취기준 DB
+  allStandards?: { code: string; subject: string; domain: string; content: string }[]; // R8: 성취기준 후보
+  relatedSubjects?: string; // R8 후보 선별용
+  targetGrade?: string;     // R8 후보 선별용
 }
 
 // R5 요약: 선택 카드 제외 선행 카드를 카드당 200자로 잘라 반환
@@ -347,6 +349,45 @@ function buildR5Summary(
     }));
 }
 
+/**
+ * 캐시 가능한(안정) 컨텍스트 블록 — prompt cache breakpoint 앞에 온다.
+ *
+ * 같은 카드에 머무는 동안에는 턴이 바뀌어도 바이트가 완전히 같아야 한다.
+ * 캐싱은 접두사 완전 일치라서 한 글자만 달라져도 뒤 전체가 무효화되므로,
+ * 매 턴 바뀌는 값(카드 입력·팀원 의견·확인 멘트 등)은 여기 넣지 말 것.
+ */
+export function buildStableContextBlock(ctx: PageContext): string {
+  const code = ctx.selectedActivityCode;
+  const lines: string[] = [];
+
+  if (code) {
+    const directive = STEP_DIRECTIVES[code];
+    if (directive) {
+      lines.push('---');
+      lines.push(`## [${code}] 카드의 AI 행동 지침`);
+      lines.push(directive);
+    }
+  }
+
+  // ── R8: 성취기준 후보 목록 (A-3 전용) ────────────────────────────
+  // 예전에는 655건 전량(약 4만 자)을 매 턴 실어 보냈다.
+  // 지금은 수업의 교과로 좁힌 후보만 보내고, 이 블록까지 캐시에 태운다.
+  if (ctx.allStandards && ctx.allStandards.length > 0) {
+    lines.push('');
+    lines.push('### 성취기준 후보 목록 (R8) — 2022 개정 교육과정 중학교');
+    lines.push('아래 성취기준을 분석 및 추천의 참고 데이터로 활용하세요.');
+    lines.push('형식: [코드] (교과 · 영역) 내용');
+    lines.push('');
+    for (const s of ctx.allStandards) {
+      const domain = s.domain ? ` · ${s.domain}` : '';
+      lines.push(`${s.code} (${s.subject}${domain}) ${s.content.replace(/\n/g, ' ')}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/** 매 턴 달라지는 워크스페이스 상태 — 캐시 breakpoint 뒤에 온다. */
 export function buildPageContextBlock(ctx: PageContext): string {
   const code = ctx.selectedActivityCode;
   const res = getCardResources(code);
@@ -358,7 +399,7 @@ export function buildPageContextBlock(ctx: PageContext): string {
   if (ctx.projectTitle) lines.push(`- 프로젝트명: ${ctx.projectTitle}`);
   if (ctx.activePhase)  lines.push(`- 현재 단계: ${ctx.activePhase}`);
 
-  // ── 선택된 카드 + 지침 ────────────────────────────────────────────
+  // ── 선택된 카드 ───────────────────────────────────────────────────
   if (code) {
     lines.push(`- 현재 카드: **[${code}]**`);
 
@@ -369,14 +410,7 @@ export function buildPageContextBlock(ctx: PageContext): string {
       lines.push(selectedText);
     }
 
-    const directive = STEP_DIRECTIVES[code];
-    if (directive) {
-      lines.push('');
-      lines.push('### 이 카드의 AI 행동 지침');
-      lines.push(directive);
-    }
-
-    // 확인 멘트
+    // 확인 멘트는 호출마다 변형이 번갈아 바뀐다 → 안정 블록에 두면 캐시가 매번 깨진다
     lines.push('');
     lines.push(`### 응답 마지막 확인 멘트 (아래 문장으로 끝낼 것)`);
     lines.push(`"${getClosingMessage(code)}"`);
@@ -451,19 +485,6 @@ export function buildPageContextBlock(ctx: PageContext): string {
         lines.push(`**[${f.name}]**`);
         lines.push(body);
       }
-    }
-  }
-
-  // ── R8: 전체 성취기준 DB (A-3 전용) ──────────────────────────
-  if (ctx.allStandards && ctx.allStandards.length > 0) {
-    lines.push('');
-    lines.push('### 전체 성취기준 목록 (R8) — 2022 개정 교육과정 중학교');
-    lines.push('아래 성취기준 전체를 분석 및 추천의 참고 데이터로 활용하세요.');
-    lines.push('형식: [코드] (교과 · 영역) 내용');
-    lines.push('');
-    for (const s of ctx.allStandards) {
-      const domain = s.domain ? ` · ${s.domain}` : '';
-      lines.push(`${s.code} (${s.subject}${domain}) ${s.content.replace(/\n/g, ' ')}`);
     }
   }
 

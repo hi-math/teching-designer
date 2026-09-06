@@ -12,12 +12,16 @@ import ReferenceModal from "@/components/workspace/ReferenceModal";
 import StandardsModal, { type StandardItem } from "@/components/workspace/StandardsModal";
 import IdeasModal, { type IdeaItem } from "@/components/workspace/IdeasModal";
 import ShareModal from "@/components/workspace/ShareModal";
-import CardFieldRenderer from "@/components/workspace/CardFields";
+import ActivityCard, { type OpinionEntry } from "@/components/workspace/ActivityCard";
 import { CARD_SCHEMAS, serializeStructuredForAI } from "@/components/workspace/cardSchemas";
 
 // ─── 워크스페이스 UI 토큰 (세이지 테마 고정) ─────────────────────
 
 const SIDEBAR_BG = "#f1f4f9";
+
+// ActivityCard 로 내려가는 빈 값 — 매 렌더 새 리터럴을 만들면 memo 가 항상 깨진다
+const EMPTY_FIELDS: Record<string, unknown> = {};
+const EMPTY_OPINIONS: OpinionEntry[] = [];
 
 // ─── 상수 ─────────────────────────────────────────────────────────
 
@@ -774,16 +778,18 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const [opinionDraft, setOpinionDraft] = useState("");
   const [opinions, setOpinions] = useState<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
   const [opinionResponses, setOpinionResponses] = useState<Record<string, Record<string, string>>>({});
-  const [myOpinionDrafts, setMyOpinionDrafts] = useState<Record<string, string>>({});
-  const [editingOpinions, setEditingOpinions] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const opinionChannelRef = useRef<any>(null);
   // ── 버전 관리 ────────────────────────────────────────────────
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
 
   // ── 참고자료 ─────────────────────────────────────────────────
-  type RefFile = { name: string; mime: string; content?: string; pdfData?: string };
+  // 목록용(가벼움)과 전송용(본문 포함)을 분리한다
+  type RefFile = { name: string; mime: string; size: number };
+  type RefFileContent = { name: string; mime: string; content?: string; pdfData?: string };
   const [referenceFiles, setReferenceFiles] = useState<RefFile[]>([]);
+  const referenceFilesRef = useRef<RefFile[]>([]);
+  useEffect(() => { referenceFilesRef.current = referenceFiles; }, [referenceFiles]);
 
   // ── 성취기준 ─────────────────────────────────────────────────
   const [selectedStandards, setSelectedStandards] = useState<StandardItem[]>([]);
@@ -806,6 +812,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const menuRef = useRef<HTMLDivElement>(null);
   // 자동저장 디바운스 타이머
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // 내가 마지막으로 DB 에 쓴 텍스트 — Realtime 에코를 걸러내는 데 쓴다
+  const lastLocalWriteRef = useRef<Record<string, string>>({});
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 미저장 콘텐츠 추적 (세션 종료 시 flush용)
   const pendingContent = useRef<Record<string, object>>({});
@@ -1011,22 +1019,32 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
         const { activity_code, content } = row;
         // 의견 관련 코드는 Broadcast로 처리 → 무시
         if (activity_code.includes("__opinion")) return;
-        // 일반 텍스트
-        if ((content as { text?: string })?.text !== undefined) {
-          setActivityInputs((prev) => ({ ...prev, [activity_code]: (content as { text: string }).text }));
-        }
+
+        const text = (content as { text?: string })?.text;
+        if (text === undefined) return;
+
+        // 내가 저장한 내용이 되돌아온 경우는 무시한다.
+        // 그대로 반영하면 불필요한 리렌더가 생기고, 저장 후에도 계속 타이핑 중이면
+        // 1초 전 텍스트가 textarea 를 덮어써 방금 친 글자가 날아간다.
+        if (pendingContent.current[activity_code] !== undefined) return; // 로컬 편집이 더 최신
+        if (lastLocalWriteRef.current[activity_code] === text) return;   // 내 저장의 에코
+
+        setActivityInputs((prev) => (
+          prev[activity_code] === text ? prev : { ...prev, [activity_code]: text }
+        ));
       };
 
       rtChannel = supabaseRt
         .channel(`activity-contents:${lessonId}`)
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "activity_contents" },
+          // filter 가 없으면 DB 안 모든 수업의 변경 이벤트를 전부 받아 클라이언트에서 버리게 된다
+          { event: "INSERT", schema: "public", table: "activity_contents", filter: `lesson_id=eq.${lessonId}` },
           handleContentChange
         )
         .on(
           "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "activity_contents" },
+          { event: "UPDATE", schema: "public", table: "activity_contents", filter: `lesson_id=eq.${lessonId}` },
           handleContentChange
         )
         .on(
@@ -1167,7 +1185,11 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
   useEffect(() => { loadSnapshots(); }, [loadSnapshots]);
 
-  // ── 참고자료 로드 (텍스트 파일은 내용도 포함) ──────────────
+  // ── 참고자료 목록 로드 ──────────────────────────────────────
+  // 여기서는 목록(이름/타입/크기)만 가져온다.
+  // 예전에는 진입 즉시 PDF 본문까지 전부 내려받아 base64 로 바꿨는데,
+  // 파일 하나가 최대 10MB(+base64 33%)라 워크스페이스 진입이 그만큼 통째로 밀렸다.
+  // 실제 본문은 AI 에게 보내기 직전에만 loadReferenceContents() 로 가져온다.
   const loadReferenceFiles = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase.storage
@@ -1175,46 +1197,71 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       .list(lessonId, { sortBy: { column: "created_at", order: "desc" } });
     if (!data) return;
 
-    const items = data.filter((f) => f.name !== ".emptyFolderPlaceholder");
-    const results: { name: string; mime: string; content?: string; pdfData?: string }[] = [];
+    const items = data
+      .filter((f) => f.name !== ".emptyFolderPlaceholder")
+      .map((f) => ({
+        name: f.name,
+        mime: (f as { metadata?: { mimetype?: string } }).metadata?.mimetype ?? "",
+        size: (f as { metadata?: { size?: number } }).metadata?.size ?? 0,
+      }));
 
-    for (const f of items) {
-      const mime: string = (f as { metadata?: { mimetype?: string } }).metadata?.mimetype ?? "";
-      const size: number = (f as { metadata?: { size?: number } }).metadata?.size ?? 0;
-      const isPdf = mime === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-      const isText =
-        !isPdf &&
-        (mime.startsWith("text/") ||
-          ["txt", "md", "csv", "json"].some((ext) => f.name.toLowerCase().endsWith("." + ext)));
-
-      if (isPdf && size < 10 * 1024 * 1024) {
-        // PDF → base64 (Claude native document block)
-        const { data: blob } = await supabase.storage
-          .from("lesson-files")
-          .download(`${lessonId}/${f.name}`);
-        if (blob) {
-          const pdfData = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve((reader.result as string).split(",")[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          results.push({ name: f.name, mime: "application/pdf", pdfData });
-        }
-      } else if (isText && size < 60_000) {
-        const { data: blob } = await supabase.storage
-          .from("lesson-files")
-          .download(`${lessonId}/${f.name}`);
-        const content = blob ? await blob.text() : undefined;
-        results.push({ name: f.name, mime, content });
-      } else {
-        results.push({ name: f.name, mime });
-      }
-    }
-    setReferenceFiles(results);
+    setReferenceFiles(items);
+    // 목록이 바뀌었으니 본문 캐시는 버린다
+    refContentCache.current = {};
   }, [lessonId]);
 
   useEffect(() => { loadReferenceFiles(); }, [loadReferenceFiles]);
+
+  // ── 참고자료 본문 지연 로드 (AI 전송 직전에만 호출) ──────────
+  // 파일별로 한 번만 받아 캐시하고, 여러 파일은 병렬로 처리한다.
+  const refContentCache = useRef<Record<string, RefFileContent>>({});
+  const loadReferenceContents = useCallback(async (): Promise<RefFileContent[]> => {
+    const files = referenceFilesRef.current;
+    if (files.length === 0) return [];
+    const supabase = createClient();
+
+    return Promise.all(
+      files.map(async (f) => {
+        const cached = refContentCache.current[f.name];
+        if (cached) return cached;
+
+        const lower = f.name.toLowerCase();
+        const isPdf = f.mime === "application/pdf" || lower.endsWith(".pdf");
+        const isText =
+          !isPdf &&
+          (f.mime.startsWith("text/") ||
+            ["txt", "md", "csv", "json"].some((ext) => lower.endsWith("." + ext)));
+
+        let result: RefFileContent = { name: f.name, mime: f.mime };
+        try {
+          if (isPdf && f.size < 10 * 1024 * 1024) {
+            const { data: blob } = await supabase.storage
+              .from("lesson-files")
+              .download(`${lessonId}/${f.name}`);
+            if (blob) {
+              const pdfData = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(",")[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              result = { name: f.name, mime: "application/pdf", pdfData };
+            }
+          } else if (isText && f.size < 60_000) {
+            const { data: blob } = await supabase.storage
+              .from("lesson-files")
+              .download(`${lessonId}/${f.name}`);
+            result = { name: f.name, mime: f.mime, content: blob ? await blob.text() : undefined };
+          }
+        } catch (err) {
+          console.error("[reference] load error:", f.name, err);
+        }
+
+        refContentCache.current[f.name] = result;
+        return result;
+      })
+    );
+  }, [lessonId]);
 
   // ── 미응답 의견묻기가 있는 단계 집합 ────────────────────────
   const phasesWithPendingOpinions = useMemo(() => {
@@ -1312,6 +1359,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
       hasNewSavesRef.current = true;
       delete pendingContent.current[activityCode];
 
+      const text = (content as { text?: string }).text;
+      if (text !== undefined) lastLocalWriteRef.current[activityCode] = text;
+
       const supabase = createClient();
       supabase.from("activity_contents").upsert(
         { lesson_id: lessonId, activity_code: activityCode, content },
@@ -1355,14 +1405,87 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     const isStructured = !!CARD_SCHEMAS[code];
     const content = isStructured
       ? { type: "structured", fields: structuredInputsRef.current[code] ?? {}, status: newStatus }
-      : { type: "text", text: activityInputs[code] ?? "", status: newStatus };
+      // activityInputs 를 직접 참조하면 타이핑할 때마다 이 콜백이 새로 만들어진다 → ref 사용
+      : { type: "text", text: activityInputsRef.current[code] ?? "", status: newStatus };
     createClient().from("activity_contents").upsert(
       { lesson_id: lessonId, activity_code: code, content },
       { onConflict: "lesson_id,activity_code" }
     );
-  }, [lessonId, activityInputs]);
+  }, [lessonId]);
 
 
+
+  // ── ActivityCard 용 파생 값 ─────────────────────────────────
+  // 카드마다 자기 몫만 받도록 미리 갈라 둔다. 카드가 opinions 전체를 받으면
+  // 다른 카드의 의견이 바뀔 때마다 모든 카드가 다시 렌더된다.
+  const opinionsByActivity = useMemo(() => {
+    const grouped: Record<string, OpinionEntry[]> = {};
+    for (const [opinionKey, o] of Object.entries(opinions)) {
+      (grouped[o.actCode] ??= []).push({
+        opinionKey,
+        question: o.question,
+        hidden: o.hidden,
+        responses: opinionResponses[opinionKey] ?? {},
+      });
+    }
+    return grouped;
+  }, [opinions, opinionResponses]);
+
+  const memberNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const m of lessonMembers) names[m.id] = m.name;
+    if (userProfile) {
+      names[userProfile.id] = userProfile.display_name ?? userProfile.email ?? "나";
+    }
+    return names;
+  }, [lessonMembers, userProfile]);
+
+  const handleSelectActivity = useCallback((code: string) => {
+    setSelectedActivityCode(code);
+    setRightTab("ai");
+  }, []);
+
+  const handleAiGuide = useCallback((act: { code: string; label: string }) => {
+    setSelectedActivityCode(act.code);
+    setRightTab("ai");
+    setChatTrigger(`${act.code} "${act.label}" 카드 작성법을 안내해 주세요. 어떤 내용을 어떻게 입력하면 좋은지 구체적으로 알려주세요.`);
+  }, []);
+
+  const handleToggleOpinionHidden = useCallback((opinionKey: string) => {
+    setOpinions((prev) => ({
+      ...prev,
+      [opinionKey]: { ...prev[opinionKey], hidden: !prev[opinionKey].hidden },
+    }));
+  }, []);
+
+  const handleDeleteOpinion = useCallback(async (opinionKey: string) => {
+    // 질문 행 + 모든 응답 행(__opinion, __opinion_res_*)을 DB에서 완전 삭제
+    const { error } = await createClient()
+      .from("activity_contents")
+      .delete()
+      .eq("lesson_id", lessonId)
+      .like("activity_code", `${opinionKey}__opinion%`);
+    if (error) { console.error("[opinion] 삭제 실패:", error.message); return; }
+    opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
+    setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+    setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+  }, [lessonId]);
+
+  const handleSubmitOpinion = useCallback((opinionKey: string, text: string) => {
+    const myId = userProfileRef.current?.id ?? "";
+    const resp = text.trim();
+    if (!resp || !myId) return;
+
+    createClient().from("activity_contents").upsert(
+      { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
+      { onConflict: "lesson_id,activity_code" }
+    ).then(({ error }) => {
+      if (error) console.error("[opinion response] DB save error:", error.message);
+      else opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
+    });
+
+    setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
+  }, [lessonId]);
 
   // ── 단계 변경 (DB 저장 + Broadcast) ────────────────────────────
   const handlePhaseChange = useCallback(async (phase: string) => {
@@ -2239,300 +2362,32 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                     </div>
                     <p className="mt-2 text-[16px] leading-relaxed text-[#5a6066]">{activePhaseData?.description}</p>
                   </div>
-                  {allActivities.map((act) => {
-                    const st = activityStatus[act.code] ?? "active";
-                    const locked = st === "completed" || st === "skipped";
-                    return (
-                      <div
-                        key={act.code}
-                        onClick={() => {
-                          setSelectedActivityCode(act.code);
-                          setRightTab("ai");
-                        }}
-                        className={`relative mb-6 rounded-2xl p-6 border transition-all cursor-pointer overflow-hidden ${
-                          st === "completed" ? "bg-[#eff8ff] border-[#bae0ff]"
-                          : st === "skipped"  ? "bg-[#f5f6f8] border-[#e2e4ea]"
-                          : "bg-white border-transparent"
-                        }`}
-                      >
-                        {/* 활성화 인디케이터 — 왼쪽 세로 바 */}
-                        {selectedActivityCode === act.code && (
-                          <span className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl bg-[#5044e3]" />
-                        )}
-                        {/* 헤더: 코드 + 토글 버튼 */}
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className={`text-[13px] font-bold tracking-widest uppercase ${locked ? "text-[#adb2ba]" : "text-[#5044e3]"}`}>
-                            {act.code}
-                          </p>
-                          <div className="flex flex-row gap-1.5">
-                            {(isHost || permissions.complete) && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "completed" ? "active" : "completed"); }}
-                                className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
-                                  st === "completed"
-                                    ? "bg-teal-200 text-teal-800"
-                                    : "bg-teal-50 text-teal-700 hover:bg-teal-100"
-                                }`}
-                              >
-                                완료
-                              </button>
-                            )}
-                            {(isHost || permissions.skip) && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); handleActivityStatusChange(act.code, st === "skipped" ? "active" : "skipped"); }}
-                                className={`rounded-md px-3 py-1 text-[12px] font-medium transition ${
-                                  st === "skipped"
-                                    ? "bg-[#e2e4ea] text-[#5a6066]"
-                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                                }`}
-                              >
-                                건너뛰기
-                              </button>
-                            )}
-                            {isHost && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedActivityCode(act.code); setOpinionModal(act.code); }}
-                                className="rounded-md px-3 py-1 text-[12px] font-medium transition bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                              >
-                                의견묻기
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 제목 + 설명 */}
-                        <div className="mb-4 flex flex-col gap-1.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className={`text-xl font-semibold ${locked ? "text-[#adb2ba]" : "text-[#2d3339]"}`}>
-                                {act.label}
-                              </h3>
-                              {act.badge && (
-                                <span className="mt-1 inline-block rounded-full bg-[#f1f4f9] px-2.5 py-1 text-xs text-[#757b82]">
-                                  {act.badge}
-                                </span>
-                              )}
-                            </div>
-                            {/* AI 안내 버튼 */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedActivityCode(act.code);
-                                setRightTab('ai');
-                                setChatTrigger(`${act.code} "${act.label}" 카드 작성법을 안내해 주세요. 어떤 내용을 어떻게 입력하면 좋은지 구체적으로 알려주세요.`);
-                              }}
-                              title="AI 안내"
-                              className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-teal-50 text-teal-600 hover:bg-teal-100 transition-colors"
-                            >
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </button>
-                          </div>
-                          <p className="text-[15px] leading-relaxed text-[#5a6066]">{act.description}</p>
-                        </div>
-
-                        {/* A-3 검색 버튼 */}
-                        {act.code === 'A-3' && !locked && (
-                          <div className="mb-3 flex gap-2" onClick={e => e.stopPropagation()}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setActiveModal("핵심아이디어검색"); }}
-                              className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-[13px] font-medium text-teal-700 hover:bg-teal-100 transition-colors"
-                            >
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                              </svg>
-                              핵심아이디어 검색
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setActiveModal("성취기준검색"); }}
-                              className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-[13px] font-medium text-teal-700 hover:bg-teal-100 transition-colors"
-                            >
-                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              성취기준 검색
-                            </button>
-                          </div>
-                        )}
-
-                        {/* 입력 영역 */}
-                        {CARD_SCHEMAS[act.code] ? (
-                          <CardFieldRenderer
-                            schema={CARD_SCHEMAS[act.code]}
-                            value={structuredInputs[act.code] ?? {}}
-                            onChange={(fields) => handleStructuredChange(act.code, fields)}
-                            locked={locked}
-                          />
-                        ) : (
-                          <textarea
-                            value={activityInputs[act.code] ?? ""}
-                            onChange={(e) => handleActivityChange(act.code, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            disabled={locked}
-                            placeholder="내용을 입력하세요…"
-                            className="w-full min-h-[100px] resize-y rounded-xl border-none bg-[#f1f4f9] px-4 py-3 text-[16px] leading-relaxed text-[#2d3339] placeholder-[#adb2ba] outline-none transition focus:ring-2 focus:ring-[#5044e3]/20 disabled:opacity-60 disabled:resize-none"
-                          />
-                        )}
-
-                        {/* 의견묻기 섹션 — opinionKey별로 스택 */}
-                        {Object.entries(opinions)
-                          .filter(([, o]) => o.actCode === act.code)
-                          .map(([opinionKey, opinionData]) => {
-                          const myId = userProfile?.id ?? "";
-                          const myResponse = opinionResponses[opinionKey]?.[myId];
-                          const hasSubmitted = !!myResponse;
-                          const allResponses = Object.entries(opinionResponses[opinionKey] ?? {});
-                          // 멤버 이름 조회 (소유자 포함)
-                          const allMembers = [
-                            ...(userProfile ? [{ id: userProfile.id, name: userProfile.display_name ?? userProfile.email ?? "나" }] : []),
-                            ...lessonMembers.filter((m) => m.id !== userProfile?.id),
-                          ];
-                          const getName = (uid: string) => allMembers.find((m) => m.id === uid)?.name ?? uid;
-
-                          return (
-                            <div key={opinionKey} className="mt-4 rounded-xl border border-[#e0e2f0] bg-[#f8f9ff] p-4" onClick={(e) => e.stopPropagation()}>
-                              {/* 헤더 */}
-                              <div className="mb-3 flex items-start justify-between gap-2">
-                                <div className="flex items-start gap-2 min-w-0">
-                                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#5044e3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <p className="text-[14px] font-semibold text-[#5044e3]">{opinionData.question}</p>
-                                </div>
-                                {isHost && (
-                                  <div className="flex shrink-0 items-center gap-1">
-                                    <button
-                                      onClick={() => setOpinions((prev) => ({ ...prev, [opinionKey]: { ...prev[opinionKey], hidden: !prev[opinionKey].hidden } }))}
-                                      title={opinionData.hidden ? "보이기" : "숨기기"}
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-[#e8eaf4] hover:text-[#5044e3]"
-                                    >
-                                      {opinionData.hidden
-                                        ? <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                                        : <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                      }
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        // 질문 행 + 모든 응답 행(__opinion, __opinion_res_*)을 DB에서 완전 삭제
-                                        const { error } = await createClient()
-                                          .from("activity_contents")
-                                          .delete()
-                                          .eq("lesson_id", lessonId)
-                                          .like("activity_code", `${opinionKey}__opinion%`);
-                                        if (error) { console.error("[opinion] 삭제 실패:", error.message); return; }
-                                        opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
-                                        setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
-                                        setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
-                                      }}
-                                      title="삭제"
-                                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#adb2ba] transition hover:bg-red-50 hover:text-red-400"
-                                    >
-                                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {!opinionData.hidden && (
-                                <div className="space-y-3">
-                                  {/* 내 답변 입력 (미제출이거나 수정 중) */}
-                                  {(!hasSubmitted || editingOpinions.has(opinionKey)) ? (
-                                    <div className="flex gap-2">
-                                      <input
-                                        value={myOpinionDrafts[opinionKey] ?? ""}
-                                        onChange={(e) => setMyOpinionDrafts((prev) => ({ ...prev, [opinionKey]: e.target.value }))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "Enter" && !e.shiftKey) {
-                                            e.preventDefault();
-                                            const resp = myOpinionDrafts[opinionKey]?.trim();
-                                            if (!resp || !myId) return;
-                                            createClient().from("activity_contents").upsert(
-                                              { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
-                                              { onConflict: "lesson_id,activity_code" }
-                                            ).then(({ error }) => {
-                                              if (error) console.error("[opinion response] DB save error:", error.message);
-                                              else opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
-                                            });
-                                            setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
-                                            setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
-                                            setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
-                                          }
-                                        }}
-                                        autoFocus={editingOpinions.has(opinionKey)}
-                                        placeholder="의견을 입력하세요…"
-                                        className="flex-1 rounded-lg border border-[#dde3eb] bg-white px-3 py-2 text-[14px] text-[#2d3339] placeholder-[#adb2ba] outline-none focus:border-[#5044e3]"
-                                      />
-                                      <button
-                                        disabled={!myOpinionDrafts[opinionKey]?.trim() || !myId}
-                                        onClick={() => {
-                                          const resp = myOpinionDrafts[opinionKey]?.trim();
-                                          if (!resp || !myId) return;
-                                          createClient().from("activity_contents").upsert(
-                                            { lesson_id: lessonId, activity_code: `${opinionKey}__opinion_res_${myId}`, content: { type: "opinion_response", response: resp } },
-                                            { onConflict: "lesson_id,activity_code" }
-                                          ).then(({ error }) => {
-                                            if (error) console.error("[opinion response] DB save error:", error.message);
-                                            else opinionChannelRef.current?.send({ type: "broadcast", event: "response", payload: { opinionKey, userId: myId, response: resp } });
-                                          });
-                                          setOpinionResponses((prev) => ({ ...prev, [opinionKey]: { ...(prev[opinionKey] ?? {}), [myId]: resp } }));
-                                          setMyOpinionDrafts((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
-                                          setEditingOpinions((prev) => { const n = new Set(prev); n.delete(opinionKey); return n; });
-                                        }}
-                                        className="shrink-0 rounded-lg bg-[#5044e3] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#4035c8] disabled:opacity-40"
-                                      >
-                                        전송
-                                      </button>
-                                    </div>
-                                  ) : null}
-
-                                  {/* 내 제출 답변 표시 + 수정 버튼 */}
-                                  {hasSubmitted && !editingOpinions.has(opinionKey) && (
-                                    <div className="flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2">
-                                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-200 text-xs font-semibold text-indigo-700">
-                                        {getName(myId).charAt(0)}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-semibold text-indigo-600">나의 답변</p>
-                                        <p className="text-[14px] leading-snug text-[#2d3339]">{myResponse}</p>
-                                      </div>
-                                      <button
-                                        onClick={() => {
-                                          setMyOpinionDrafts((prev) => ({ ...prev, [opinionKey]: myResponse ?? "" }));
-                                          setEditingOpinions((prev) => new Set([...prev, opinionKey]));
-                                        }}
-                                        className="shrink-0 rounded-md border border-[#dde3eb] bg-white px-2 py-1 text-[12px] font-medium text-[#5a6066] transition hover:bg-gray-50"
-                                      >
-                                        수정
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* 다른 사람 답변 목록 */}
-                                  {allResponses.filter(([uid, r]) => uid !== myId && r.trim()).length > 0 && (
-                                    <div className="space-y-2">
-                                      {allResponses.filter(([uid, r]) => uid !== myId && r.trim()).map(([uid, resp]) => (
-                                        <div key={uid} className="flex items-start gap-2">
-                                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
-                                            {getName(uid).charAt(0)}
-                                          </div>
-                                          <div>
-                                            <p className="text-[12px] font-semibold text-[#5a6066]">{getName(uid)}</p>
-                                            <p className="text-[14px] leading-snug text-[#2d3339]">{resp}</p>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                      </div>
-                    );
-                  })}
+                  {allActivities.map((act) => (
+                    <ActivityCard
+                      key={act.code}
+                      act={act}
+                      status={activityStatus[act.code] ?? "active"}
+                      isSelected={selectedActivityCode === act.code}
+                      isHost={isHost}
+                      canComplete={isHost || permissions.complete}
+                      canSkip={isHost || permissions.skip}
+                      textValue={activityInputs[act.code] ?? ""}
+                      structuredValue={structuredInputs[act.code] ?? EMPTY_FIELDS}
+                      opinions={opinionsByActivity[act.code] ?? EMPTY_OPINIONS}
+                      myUserId={userProfile?.id ?? ""}
+                      memberNames={memberNames}
+                      onSelect={handleSelectActivity}
+                      onStatusChange={handleActivityStatusChange}
+                      onAskOpinion={setOpinionModal}
+                      onAiGuide={handleAiGuide}
+                      onOpenModal={setActiveModal}
+                      onTextChange={handleActivityChange}
+                      onStructuredChange={handleStructuredChange}
+                      onToggleOpinionHidden={handleToggleOpinionHidden}
+                      onDeleteOpinion={handleDeleteOpinion}
+                      onSubmitOpinion={handleSubmitOpinion}
+                    />
+                  ))}
                 </div>
               );
             })()}
@@ -2607,6 +2462,9 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                     projectTitle,
                     activePhase,
                     activeSection,
+                    // A-3 성취기준 후보를 이 수업의 교과로 좁히는 데 쓰인다
+                    relatedSubjects: relatedSubjects || undefined,
+                    targetGrade: targetGrade || undefined,
                     activityInputs: mergedInputs,
                     selectedActivityCode: selectedActivityCode ?? undefined,
                     referenceFiles: referenceFiles.length > 0 ? referenceFiles : undefined,
@@ -2617,6 +2475,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
                 })()}
                 lessonId={lessonId}
                 userId={userProfile?.id ?? ""}
+                loadReferenceContents={loadReferenceContents}
               />
             </div>
 

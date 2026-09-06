@@ -11,10 +11,13 @@ interface PageContext {
   activeSection: string;
   activityInputs: Record<string, string>;
   selectedActivityCode?: string;
-  referenceFiles?: { name: string; mime: string; content?: string; pdfData?: string }[];
+  /** 목록만 담긴다 (이름/타입). 본문은 loadReferenceContents 로 전송 직전에 가져온다. */
+  referenceFiles?: { name: string; mime: string }[];
   selectedStandards?: { code: string; subject: string; domain: string; content: string }[];
   selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
   opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
+  relatedSubjects?: string;
+  targetGrade?: string;
 }
 
 interface Props {
@@ -24,6 +27,13 @@ interface Props {
   lessonId?: string;
   userId?: string;
   triggerMessage?: string; // auto-sends when changed
+  /**
+   * 참고자료 본문(PDF base64 / 텍스트)을 전송 직전에 가져오는 콜백.
+   * 페이지 진입 시점에 수십 MB 를 미리 받지 않기 위해 지연 호출한다.
+   */
+  loadReferenceContents?: () => Promise<
+    { name: string; mime: string; content?: string; pdfData?: string }[]
+  >;
 }
 
 function nowTimestamp() {
@@ -33,7 +43,7 @@ function nowTimestamp() {
   return `${h >= 12 ? '오후' : '오전'} ${h > 12 ? h - 12 : h === 0 ? 12 : h}:${m}`;
 }
 
-export default function ChatInterface({ stage, onReady, pageContext, lessonId, userId, triggerMessage }: Props) {
+export default function ChatInterface({ stage, onReady, pageContext, lessonId, userId, triggerMessage, loadReferenceContents }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [timestamps, setTimestamps] = useState<string[]>([]);
   const [input, setInput] = useState('');
@@ -182,8 +192,10 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
     }
 
     try {
+      // 참고자료 본문은 지금(전송 직전) 가져온다 — 파일별 캐시는 호출부가 관리한다.
+      const refContents = loadReferenceContents ? await loadReferenceContents() : [];
       // PDF 파일이 있으면 마지막 유저 메시지에 document 블록 삽입
-      const pdfs = (pageContext?.referenceFiles ?? []).filter((f) => f.pdfData);
+      const pdfs = refContents.filter((f) => f.pdfData);
       const apiMessages = newMessages.map((m, idx) => {
         if (idx === newMessages.length - 1 && m.role === 'user' && pdfs.length > 0) {
           return {
@@ -203,7 +215,15 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildChatPayload({ messages: apiMessages, stage, pageContext })),
+        body: JSON.stringify(
+          buildChatPayload({
+            messages: apiMessages,
+            stage,
+            pageContext: pageContext
+              ? { ...pageContext, referenceFiles: refContents }
+              : pageContext,
+          })
+        ),
         signal: abortRef.current.signal,
       });
 
@@ -213,17 +233,27 @@ export default function ChatInterface({ stage, onReady, pageContext, lessonId, u
       const decoder = new TextDecoder();
       let accumulated = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-
+      // 네트워크 청크마다 setState 하면 초당 수십 번 리렌더가 발생한다.
+      // 프레임당 한 번으로 묶어 화면 갱신 속도(60fps)에 맞춘다.
+      let frame = 0;
+      const paint = () => {
+        frame = 0;
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1] = { role: 'assistant', content: accumulated };
           return updated;
         });
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        if (!frame) frame = requestAnimationFrame(paint);
       }
+
+      if (frame) cancelAnimationFrame(frame);
+      paint(); // 마지막 청크 반영
 
       // 스트리밍 완료 후 캐시 업데이트
       setMessages((prev) => {

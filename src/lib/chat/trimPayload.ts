@@ -36,6 +36,8 @@ interface PageContext {
   selectedStandards?: { code: string; subject: string; domain: string; content: string }[];
   selectedIdeas?: { id: string; subject: string; domain: string; content: string }[];
   opinions?: { activityCode: string; question: string; responses: { name: string; text: string }[] }[];
+  relatedSubjects?: string;
+  targetGrade?: string;
 }
 
 // ────────────────────────────────────────────────

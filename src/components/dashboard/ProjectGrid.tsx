@@ -426,6 +426,7 @@ function LessonCard({
   onDragEnd,
   onContextMenu,
   onClick,
+  onPrefetch,
 }: {
   item: Item;
   isDragging: boolean;
@@ -435,6 +436,7 @@ function LessonCard({
   onDragEnd: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onClick: () => void;
+  onPrefetch?: () => void;
 }) {
   const dragMoved = useRef(false);
   const renameSubmitted = useRef(false);
@@ -462,6 +464,8 @@ function LessonCard({
       onDrag={() => { dragMoved.current = true; }}
       onDragEnd={onDragEnd}
       onClick={() => { if (!dragMoved.current) onClick(); }}
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       onContextMenu={onContextMenu}
       className={`group flex cursor-pointer flex-col rounded-xl border bg-white p-4 shadow-sm transition-all ${
         isDragging
@@ -520,14 +524,18 @@ function FlatLessonCard({
   item,
   onContextMenu,
   onClick,
+  onPrefetch,
 }: {
   item: Item;
   onContextMenu: (e: React.MouseEvent) => void;
   onClick: () => void;
+  onPrefetch?: () => void;
 }) {
   return (
     <div
       onClick={onClick}
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       onContextMenu={onContextMenu}
       className="group flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md"
     >
@@ -678,12 +686,29 @@ export default function ProjectGrid({
 
   // ── 데이터 로드 ──────────────────────────────────────────────
 
+  // 카드에 마우스를 올리는 순간 워크스페이스 라우트를 미리 받아둔다.
+  // 카드가 draggable div 라 <Link> 로 감쌀 수 없어 자동 프리페치가 걸리지 않으므로
+  // router.prefetch 를 직접 호출한다. id 당 한 번만.
+  const prefetchedRef = useRef<Set<string>>(new Set());
+  const prefetchLesson = useCallback((id: string) => {
+    if (prefetchedRef.current.has(id)) return;
+    prefetchedRef.current.add(id);
+    router.prefetch(`/workspace/${id}`);
+  }, [router]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
+    // 필요한 컬럼만 조회한다 (select("*") 는 permissions jsonb 등 화면에 안 쓰는 값까지 끌고 온다)
     const [lessonsRes, foldersRes] = await Promise.all([
-      supabase.from("lessons").select("*").order("updated_at", { ascending: false }),
-      supabase.from("folders").select("*").order("title"),
+      supabase
+        .from("lessons")
+        .select("id, title, subject, folder_id, owner_id, updated_at, last_accessed_at, deleted_at, status, bookmarked")
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("folders")
+        .select("id, title, parent_id, owner_id, updated_at, deleted_at")
+        .order("title"),
     ]);
 
     const folderItems: Item[] = (foldersRes.data ?? []).map((f) => ({
@@ -1125,6 +1150,7 @@ export default function ProjectGrid({
                     onDragEnd={handleDragEnd}
                     onContextMenu={(e) => handleContextMenu(e, item.id)}
                     onClick={() => { if (renameId !== item.id) router.push(`/workspace/${item.id}`); }}
+                    onPrefetch={() => prefetchLesson(item.id)}
                   />
                 )
               )}
@@ -1153,6 +1179,7 @@ export default function ProjectGrid({
                   item={item}
                   onContextMenu={(e) => handleContextMenu(e, item.id)}
                   onClick={() => router.push(`/workspace/${item.id}`)}
+                  onPrefetch={() => prefetchLesson(item.id)}
                 />
               ))}
           </div>
