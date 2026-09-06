@@ -814,6 +814,8 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // 내가 마지막으로 DB 에 쓴 텍스트 — Realtime 에코를 걸러내는 데 쓴다
   const lastLocalWriteRef = useRef<Record<string, string>>({});
+  // 의견 숨기기 핸들러가 현재 질문/상태를 의존성 없이 읽기 위한 ref
+  const opinionsRef = useRef<Record<string, { question: string; hidden: boolean; actCode: string }>>({});
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 미저장 콘텐츠 추적 (세션 종료 시 flush용)
   const pendingContent = useRef<Record<string, object>>({});
@@ -885,7 +887,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
               const opinionKey = code.slice(0, -"__opinion".length);
               const m = opinionKey.match(/^(.+)__(\d+)$/);
               const actCodeFromKey = m ? m[1] : opinionKey;
-              loadedOpinions[opinionKey] = { question: c.question, hidden: false, actCode: actCodeFromKey };
+              loadedOpinions[opinionKey] = { question: c.question, hidden: c.hidden === true, actCode: actCodeFromKey };
             }
             continue;
           }
@@ -984,6 +986,12 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
           const { opinionKey } = payload as { opinionKey: string };
           setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
           setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
+        })
+        .on("broadcast", { event: "toggle_hidden" }, ({ payload }) => {
+          const { opinionKey, hidden } = payload as { opinionKey: string; hidden: boolean };
+          setOpinions((prev) => (
+            prev[opinionKey] ? { ...prev, [opinionKey]: { ...prev[opinionKey], hidden } } : prev
+          ));
         })
         .on("broadcast", { event: "response" }, ({ payload }) => {
           const { opinionKey, userId, response } = payload as { opinionKey: string; userId: string; response: string };
@@ -1345,7 +1353,18 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
 
     if (all && all.length > 10) {
       const toDelete = all.slice(0, all.length - 10).map((r: { id: string }) => r.id);
-      await supabase.from("lesson_snapshots").delete().in("id", toDelete);
+      // .select() 로 실제 삭제된 행을 확인한다. DELETE RLS 정책이 없으면
+      // 에러 없이 0 행에 적용되어 정리가 조용히 실패한다.
+      const { data: pruned, error: pruneError } = await supabase
+        .from("lesson_snapshots").delete().in("id", toDelete).select("id");
+      if (pruneError) {
+        console.error("[snapshots] 정리 실패:", pruneError.message);
+      } else if (!pruned || pruned.length === 0) {
+        console.error(
+          "[snapshots] 오래된 버전이 정리되지 않았습니다. lesson_snapshots 의 DELETE RLS 정책을 " +
+          "확인하세요 (supabase/migrations/018_missing_delete_policies.sql)."
+        );
+      }
     }
 
     loadSnapshots();
@@ -1451,21 +1470,76 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
     setChatTrigger(`${act.code} "${act.label}" 카드 작성법을 안내해 주세요. 어떤 내용을 어떻게 입력하면 좋은지 구체적으로 알려주세요.`);
   }, []);
 
+  // 숨기기는 로컬 state 만 바꾸면 새로고침 시 풀리고 다른 참여자에게도 전달되지 않는다.
+  // 질문 행 content 에 저장하고 broadcast 로 전파한다.
   const handleToggleOpinionHidden = useCallback((opinionKey: string) => {
-    setOpinions((prev) => ({
-      ...prev,
-      [opinionKey]: { ...prev[opinionKey], hidden: !prev[opinionKey].hidden },
-    }));
-  }, []);
+    const current = opinionsRef.current[opinionKey];
+    if (!current) return;
+    const hidden = !current.hidden;
+
+    setOpinions((prev) => ({ ...prev, [opinionKey]: { ...prev[opinionKey], hidden } }));
+
+    createClient().from("activity_contents").upsert(
+      {
+        lesson_id: lessonId,
+        activity_code: `${opinionKey}__opinion`,
+        content: { type: "opinion", question: current.question, active: true, hidden },
+      },
+      { onConflict: "lesson_id,activity_code" }
+    ).then(({ error }) => {
+      if (error) { console.error("[opinion] 숨기기 저장 실패:", error.message); return; }
+      opinionChannelRef.current?.send({
+        type: "broadcast", event: "toggle_hidden", payload: { opinionKey, hidden },
+      });
+    });
+  }, [lessonId]);
 
   const handleDeleteOpinion = useCallback(async (opinionKey: string) => {
-    // 질문 행 + 모든 응답 행(__opinion, __opinion_res_*)을 DB에서 완전 삭제
-    const { error } = await createClient()
+    const supabase = createClient();
+    const questionCode = `${opinionKey}__opinion`;
+    const responsePrefix = `${questionCode}_res_`;
+
+    // 지울 대상은 질문 행 1개 + 응답 행 N개다.
+    // LIKE 로 한 번에 지우지 않는 이유: LIKE 에서 _ 는 "임의의 한 글자" 와일드카드인데
+    // opinionKey 가 `코드__타임스탬프` 형태라 언더스코어를 여러 개 포함한다.
+    // 그래서 넓게 조회한 뒤 자바스크립트에서 정확히 걸러 코드로 지운다.
+    const { data: candidates, error: selectError } = await supabase
+      .from("activity_contents")
+      .select("activity_code")
+      .eq("lesson_id", lessonId)
+      .like("activity_code", `${questionCode}%`);
+
+    if (selectError) { console.error("[opinion] 삭제 대상 조회 실패:", selectError.message); return; }
+
+    const codes = (candidates ?? [])
+      .map((r) => r.activity_code as string)
+      .filter((code) => code === questionCode || code.startsWith(responsePrefix));
+
+    if (codes.length === 0) {
+      console.error("[opinion] 삭제 대상을 찾지 못했습니다:", opinionKey);
+      return;
+    }
+
+    // .select() 를 붙여 실제로 지워진 행을 돌려받는다.
+    // activity_contents 에 DELETE RLS 정책이 없으면 DELETE 는 에러 없이 0 행에
+    // 적용된다. 에러만 보고 성공으로 단정하면 화면에서만 사라지고 DB 에는 남아
+    // 다음 접속 때 되살아난다.
+    const { data: deleted, error } = await supabase
       .from("activity_contents")
       .delete()
       .eq("lesson_id", lessonId)
-      .like("activity_code", `${opinionKey}__opinion%`);
+      .in("activity_code", codes)
+      .select("activity_code");
+
     if (error) { console.error("[opinion] 삭제 실패:", error.message); return; }
+    if (!deleted || deleted.length === 0) {
+      console.error(
+        "[opinion] 삭제된 행이 없습니다. activity_contents 의 DELETE RLS 정책을 확인하세요 " +
+        "(supabase/migrations/018_missing_delete_policies.sql)."
+      );
+      return;
+    }
+
     opinionChannelRef.current?.send({ type: "broadcast", event: "delete_question", payload: { opinionKey } });
     setOpinions((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
     setOpinionResponses((prev) => { const n = { ...prev }; delete n[opinionKey]; return n; });
@@ -1562,6 +1636,7 @@ export default function WorkspaceShell({ lessonId }: { lessonId: string }) {
   useEffect(() => { activityInputsRef.current = activityInputs; }, [activityInputs]);
   useEffect(() => { structuredInputsRef.current = structuredInputs; }, [structuredInputs]);
   useEffect(() => { userProfileRef.current = userProfile; }, [userProfile]);
+  useEffect(() => { opinionsRef.current = opinions; }, [opinions]);
 
   // 세션 종료 시 미저장 내용 flush + 버전 생성 (keepalive fetch로 보장)
   useEffect(() => {
